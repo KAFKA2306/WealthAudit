@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Financial Dashboard</title>
-    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <script src="https://unpkg.com/htmx.org@2.0.1"></script>
     <style>
         :root {
             --bg-primary: #0f172a;
@@ -169,8 +169,7 @@
                         <button class="btn" hx-get="/graphs/net-worth" hx-target="#net-worth-graph">All</button>
                     </div>
                 </div>
-                <div id="net-worth-graph" class="graph-container" hx-get="/graphs/net-worth?months=12"
-                    hx-trigger="load">
+                <div id="net-worth-graph" class="graph-container" hx-get="/graphs/net-worth" hx-trigger="load">
                     <span class="spinner">Loading</span>
                 </div>
             </div>
@@ -184,7 +183,7 @@
                         <button class="btn" hx-get="/graphs/cashflow" hx-target="#cashflow-graph">All</button>
                     </div>
                 </div>
-                <div id="cashflow-graph" class="graph-container" hx-get="/graphs/cashflow?months=12" hx-trigger="load">
+                <div id="cashflow-graph" class="graph-container" hx-get="/graphs/cashflow" hx-trigger="load">
                     <span class="spinner">Loading</span>
                 </div>
             </div>
@@ -199,8 +198,7 @@
                         <button class="btn" hx-get="/graphs/allocation" hx-target="#allocation-graph">All</button>
                     </div>
                 </div>
-                <div id="allocation-graph" class="graph-container" hx-get="/graphs/allocation?months=12"
-                    hx-trigger="load">
+                <div id="allocation-graph" class="graph-container" hx-get="/graphs/allocation" hx-trigger="load">
                     <span class="spinner">Loading</span>
                 </div>
             </div>
@@ -214,7 +212,7 @@
                         <button class="btn" hx-get="/graphs/ratios" hx-target="#ratios-graph">All</button>
                     </div>
                 </div>
-                <div id="ratios-graph" class="graph-container" hx-get="/graphs/ratios?months=12" hx-trigger="load">
+                <div id="ratios-graph" class="graph-container" hx-get="/graphs/ratios" hx-trigger="load">
                     <span class="spinner">Loading</span>
                 </div>
             </div>
@@ -228,7 +226,7 @@
                         <button class="btn" hx-get="/graphs/returns" hx-target="#returns-graph">All</button>
                     </div>
                 </div>
-                <div id="returns-graph" class="graph-container" hx-get="/graphs/returns?months=12" hx-trigger="load">
+                <div id="returns-graph" class="graph-container" hx-get="/graphs/returns" hx-trigger="load">
                     <span class="spinner">Loading</span>
                 </div>
             </div>
@@ -242,7 +240,7 @@
                         <button class="btn" hx-get="/graphs/fi" hx-target="#fi-graph">All</button>
                     </div>
                 </div>
-                <div id="fi-graph" class="graph-container" hx-get="/graphs/fi?months=12" hx-trigger="load">
+                <div id="fi-graph" class="graph-container" hx-get="/graphs/fi" hx-trigger="load">
                     <span class="spinner">Loading</span>
                 </div>
             </div>

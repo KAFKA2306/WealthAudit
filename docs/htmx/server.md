@@ -14,7 +14,9 @@ The web server provides HTMX endpoints for the financial dashboard.
 | GET | `/graphs/net-worth` | `months` | Net worth stacked area chart |
 | GET | `/graphs/cashflow` | `months` | Income/expense bar chart |
 | GET | `/graphs/allocation` | - | Asset allocation donut chart |
-| GET | `/graphs/metrics` | `months` | Savings rate & alpha line chart |
+| GET | `/graphs/ratios` | `months` | Savings rate & risk asset ratio |
+| GET | `/graphs/returns` | `months` | Investment returns & alpha |
+| GET | `/graphs/fi` | `months` | Financial Independence ratios |
 
 ## Query Parameters
 

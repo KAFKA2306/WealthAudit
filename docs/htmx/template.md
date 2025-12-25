@@ -50,5 +50,7 @@ dashboard
     ├── Net Worth Trend
     ├── Cash Flow
     ├── Asset Allocation
-    └── Financial Metrics
+    ├── Financial Ratios
+    ├── Investment Returns
+    └── FI Ratios
 ```

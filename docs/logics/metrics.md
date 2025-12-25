@@ -3,31 +3,31 @@
 This document describes the logic for calculating financial metrics. The calculations are performed by the `MetricsCalculator`.
 
 ## Savings Rate
-The savings rate is the ratio of net savings to after-tax income.
+The savings rate is the ratio of net savings to after-tax income, calculated over the **trailing 12 months** to smooth out seasonality.
 
-`savings_rate = net_savings / after_tax_income`
+`savings_rate = sum(net_savings, 12m) / sum(after_tax_income, 12m)`
 
 ## Risk Asset Ratio
-The risk asset ratio is the ratio of risk assets to total financial assets.
+The risk asset ratio is the ratio of risk assets (including pension assets) to total financial assets.
 
-`risk_asset_ratio = risk_assets / total_financial_assets`
+`risk_asset_ratio = (risk_assets + pension_assets) / total_financial_assets`
 
-## Monthly Return (ROI)
-The monthly return on investment is the ratio of investment gain/loss to the previous month's risk assets.
+## Monthly Return (ROI) - Geometric Mean
+The monthly return describes the investment performance. To reduce short-term volatility and strictly measure performance trends, we calculate the **Geometric Mean** of the monthly returns over the **trailing 12 months**.
 
-`monthly_return = investment_gain_loss / prev_month_risk_assets`
+1. **Raw Monthly Return**: `raw_return = investment_gain_loss / prev_month_risk_assets`
+2. **Geometric Mean (12m)**: `monthly_return = (product(1 + raw_return, 12m))^(1/12) - 1`
 
 ## Monthly Alpha
-The monthly alpha is the excess return of the investment compared to a benchmark. The benchmark used is the S&P 500 index, converted to JPY.
+The monthly alpha is the excess return of the investment compared to the benchmark (S&P 500 JPY), also calculated using the Geometric Mean over the same 12-month period.
 
 `monthly_alpha = monthly_return - benchmark_return`
 
-where `benchmark_return` is the monthly return of the JPY-denominated S&P 500 index.
-
 ## Benchmark Return
-The benchmark return is the monthly return of the S&P 500 index converted to JPY.
+The benchmark return is the **Geometric Mean** of the S&P 500 (JPY) monthly returns over the **trailing 12 months**.
 
-`benchmark_return = (sp500_jpy_current - sp500_jpy_prev) / sp500_jpy_prev`
+1. **Raw Benchmark Return**: `raw_benchmark = (sp500_jpy_current - sp500_jpy_prev) / sp500_jpy_prev`
+2. **Geometric Mean (12m)**: `benchmark_return = (product(1 + raw_benchmark, 12m))^(1/12) - 1`
 
 This calculation accounts for both the index performance and the USD/JPY exchange rate movement.
 
@@ -50,5 +50,5 @@ The projected FI ratio for the next 12 months, based on expected benchmark retur
 `fi_ratio_next_12m = (risk_assets * expected_annual_return) / projected_annual_expenses`
 
 where:
-- `expected_annual_return` is derived from historical benchmark returns or a target return assumption
+- `expected_annual_return` is currently set to **5.0%** (0.05).
 - `projected_annual_expenses` is the trailing 12-month expenses or a user-defined budget

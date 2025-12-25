@@ -1,4 +1,4 @@
-# Household Financial Statement Calculator
+# WealthAudit
 
 ## Overview
 This is a Python-based application designed to calculate and analyze household financial statements. It processes transaction and asset data to generate:
@@ -9,6 +9,7 @@ This is a Python-based application designed to calculate and analyze household f
 ## Features
 - **Automated Calculations**: Generates BS/PL from raw CSV data.
 - **Investment Tracking**: Calculates investment profit/loss and compares performance against market benchmarks (e.g., S&P 500).
+- **Web Dashboard**: Interactive visual dashboard to analyze net worth, asset allocation, and financial independence progress.
 - **Dependency Injection**: Built with clean architecture principles using `injector`.
 
 ## Requirements
@@ -44,6 +45,17 @@ task run
 # OR
 uv run python -m src.infrastructure.cli
 ```
+
+### View Dashboard
+Launch the local web server to view the interactive dashboard:
+
+```bash
+task serve
+# OR
+uv run python -m src.infrastructure.web
+```
+
+Open [http://localhost:5000](http://localhost:5000) in your browser.
 
 ### Outputs
 Calculated files are exported to `data/calculated/`:

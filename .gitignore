@@ -1,6 +1,8 @@
 # Python
 __pycache__/
 *.pyc
+*.log
+
 
 # Distribution / Packaging
 .Python
