@@ -2,7 +2,13 @@ from dataclasses import dataclass
 from typing import NewType, Optional
 
 # Value Objects / Type Aliases
-from src.constants import AccountId, AssetClassId, PaymentMethodId, AccountType, Currency
+from src.constants import (
+    AccountId,
+    AssetClassId,
+    PaymentMethodId,
+    AccountType,
+    Currency,
+)
 
 Month = NewType("Month", str)
 

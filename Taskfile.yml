@@ -29,3 +29,14 @@ tasks:
       - uv run ruff check .
       - uv run mypy src
 
+  clean:
+    desc: Remove temporary files and virtual environment
+    cmds:
+      - rm -rf .venv .mypy_cache .ruff_cache .pytest_cache dist build
+      - find . -type d -name "__pycache__" -exec rm -rf {} +
+
+  serve:
+    desc: Start the dashboard web server
+    cmds:
+      - uv run python -m src.infrastructure.web
+

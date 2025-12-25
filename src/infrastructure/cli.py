@@ -14,7 +14,7 @@ from src.use_cases.calculators.metrics import MetricsCalculator
 
 
 def main() -> None:
-    root_dir = os.getcwd()
+    import os
     injector = Injector([AppModule(root_dir)])
 
     # Repositories
@@ -59,7 +59,9 @@ def main() -> None:
                 "net_savings": cf.net_savings / 10000,
             }
         )
-    pd.DataFrame(cf_data).to_csv(os.path.join(output_dir, "cashflow.csv"), index=False)
+    pd.DataFrame(cf_data).to_csv(
+        os.path.join(output_dir, "cashflow.csv"), index=False, float_format="%.4g"
+    )
 
     # 2. Balance Sheet
     bs_data = []
@@ -75,7 +77,7 @@ def main() -> None:
             }
         )
     pd.DataFrame(bs_data).to_csv(
-        os.path.join(output_dir, "balance_sheet.csv"), index=False
+        os.path.join(output_dir, "balance_sheet.csv"), index=False, float_format="%.4g"
     )
 
     # 3. Metrics
@@ -91,7 +93,7 @@ def main() -> None:
             }
         )
     pd.DataFrame(metrics_data).to_csv(
-        os.path.join(output_dir, "metrics.csv"), index=False
+        os.path.join(output_dir, "metrics.csv"), index=False, float_format="%.4g"
     )
 
     print(f"Successfully exported to {output_dir}")

@@ -8,7 +8,13 @@ from src.domain.entities.models import (
     Account,
     PaymentMethod,
 )
-from src.constants import AccountId, PaymentMethodId, AssetClassId, AccountType, Currency
+from src.constants import (
+    AccountId,
+    PaymentMethodId,
+    AssetClassId,
+    AccountType,
+    Currency,
+)
 from src.domain.repositories.interfaces import (
     ITransactionRepository,
     IAssetRepository,
@@ -25,7 +31,9 @@ class CsvTransactionRepository(ITransactionRepository):
         df = pd.read_csv(f"{self.data_dir}/data/input/income.csv")
         return [
             Income(
-                month=row["month"], account_id=AccountId(row["account_id"]), amount=row["amount"]
+                month=row["month"],
+                account_id=AccountId(row["account_id"]),
+                amount=row["amount"],
             )
             for _, row in df.iterrows()
         ]
@@ -34,7 +42,9 @@ class CsvTransactionRepository(ITransactionRepository):
         df = pd.read_csv(f"{self.data_dir}/data/input/expense.csv")
         return [
             Expense(
-                month=row["month"], method_id=PaymentMethodId(row["method_id"]), amount=row["amount"]
+                month=row["month"],
+                method_id=PaymentMethodId(row["method_id"]),
+                amount=row["amount"],
             )
             for _, row in df.iterrows()
         ]
@@ -97,7 +107,11 @@ class CsvMasterRepository(IMasterRepository):
             PaymentMethod(
                 id=PaymentMethodId(row["method_id"]),
                 name=row["name"],
-                settlement_account=AccountId(row["settlement_account"]) if pd.notna(row["settlement_account"]) else None,
+                settlement_account=(
+                    AccountId(row["settlement_account"])
+                    if pd.notna(row["settlement_account"])
+                    else None
+                ),
             )
             for _, row in df.iterrows()
         ]

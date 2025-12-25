@@ -23,3 +23,32 @@ The monthly alpha is the excess return of the investment compared to a benchmark
 `monthly_alpha = monthly_return - benchmark_return`
 
 where `benchmark_return` is the monthly return of the JPY-denominated S&P 500 index.
+
+## Benchmark Return
+The benchmark return is the monthly return of the S&P 500 index converted to JPY.
+
+`benchmark_return = (sp500_jpy_current - sp500_jpy_prev) / sp500_jpy_prev`
+
+This calculation accounts for both the index performance and the USD/JPY exchange rate movement.
+
+## Financial Independence Ratio (FI Ratio)
+The Financial Independence Ratio measures how many months of expenses can be covered by investment income (passive income). A ratio of 1.0 or higher indicates that passive income fully covers expenses.
+
+### Trailing 12-Month FI Ratio
+The FI ratio based on the past 12 months of data.
+
+`fi_ratio_12m = sum(investment_gain_loss, 12m) / sum(expenses, 12m)`
+
+### Trailing 48-Month FI Ratio
+The FI ratio based on the past 48 months (4 years) of data. This provides a longer-term, more stable view.
+
+`fi_ratio_48m = sum(investment_gain_loss, 48m) / sum(expenses, 48m)`
+
+### Forward 12-Month FI Ratio (Projected)
+The projected FI ratio for the next 12 months, based on expected benchmark returns and current risk assets.
+
+`fi_ratio_next_12m = (risk_assets * expected_annual_return) / projected_annual_expenses`
+
+where:
+- `expected_annual_return` is derived from historical benchmark returns or a target return assumption
+- `projected_annual_expenses` is the trailing 12-month expenses or a user-defined budget

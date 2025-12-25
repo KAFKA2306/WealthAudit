@@ -67,7 +67,6 @@ class BalanceSheetCalculator:
                 elif acc.currency == Currency.EUR:
                     rate = market.eur_jpy if market else 1.0
 
-
                 jpy_balance = asset.balance * rate
 
                 # Classification

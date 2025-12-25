@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Financial Dashboard</title>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <style>
+        :root {
+            --bg-primary: #0f172a;
+            --bg-secondary: #1e293b;
+            --bg-card: #334155;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --accent-blue: #3b82f6;
+            --accent-green: #10b981;
+            --accent-purple: #8b5cf6;
+            --border-color: #475569;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+            color: var(--text-primary);
+            min-height: 100vh;
+            padding: 2rem;
+        }
+
+        .dashboard {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        header h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            background: linear-gradient(90deg, var(--accent-blue), var(--accent-purple));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.5rem;
+        }
+
+        header p {
+            color: var(--text-secondary);
+            font-size: 1rem;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 1.5rem;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .card {
+            background: var(--bg-card);
+            border-radius: 16px;
+            padding: 1.5rem;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .card-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .btn {
+            padding: 0.4rem 0.8rem;
+            border: 1px solid var(--border-color);
+            background: transparent;
+            color: var(--text-secondary);
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: all 0.2s ease;
+        }
+
+        .btn:hover,
+        .btn.active {
+            background: var(--accent-blue);
+            border-color: var(--accent-blue);
+            color: var(--text-primary);
+        }
+
+        .graph-container {
+            min-height: 300px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .spinner {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .spinner::after {
+            content: '';
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            margin-left: 8px;
+            border: 2px solid var(--text-secondary);
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            vertical-align: middle;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="dashboard">
+        <header>
+            <h1>Financial Dashboard</h1>
+            <p>Household Balance Sheet & Cash Flow Analysis</p>
+        </header>
+
+        <div class="grid">
+            <!-- Net Worth Chart -->
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-title">Net Worth Trend</span>
+                    <div class="btn-group">
+                        <button class="btn" hx-get="/graphs/net-worth?months=12"
+                            hx-target="#net-worth-graph">1Y</button>
+                        <button class="btn" hx-get="/graphs/net-worth" hx-target="#net-worth-graph">All</button>
+                    </div>
+                </div>
+                <div id="net-worth-graph" class="graph-container" hx-get="/graphs/net-worth?months=12"
+                    hx-trigger="load">
+                    <span class="spinner">Loading</span>
+                </div>
+            </div>
+
+            <!-- Cash Flow Chart -->
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-title">Cash Flow</span>
+                    <div class="btn-group">
+                        <button class="btn" hx-get="/graphs/cashflow?months=12" hx-target="#cashflow-graph">1Y</button>
+                        <button class="btn" hx-get="/graphs/cashflow" hx-target="#cashflow-graph">All</button>
+                    </div>
+                </div>
+                <div id="cashflow-graph" class="graph-container" hx-get="/graphs/cashflow?months=12" hx-trigger="load">
+                    <span class="spinner">Loading</span>
+                </div>
+            </div>
+
+            <!-- Asset Allocation Chart -->
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-title">Asset Allocation</span>
+                    <div class="btn-group">
+                        <button class="btn" hx-get="/graphs/allocation?months=12"
+                            hx-target="#allocation-graph">1Y</button>
+                        <button class="btn" hx-get="/graphs/allocation" hx-target="#allocation-graph">All</button>
+                    </div>
+                </div>
+                <div id="allocation-graph" class="graph-container" hx-get="/graphs/allocation?months=12"
+                    hx-trigger="load">
+                    <span class="spinner">Loading</span>
+                </div>
+            </div>
+
+            <!-- Metrics Chart -->
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-title">Financial Metrics</span>
+                    <div class="btn-group">
+                        <button class="btn" hx-get="/graphs/metrics?months=12" hx-target="#metrics-graph">1Y</button>
+                        <button class="btn" hx-get="/graphs/metrics" hx-target="#metrics-graph">All</button>
+                    </div>
+                </div>
+                <div id="metrics-graph" class="graph-container" hx-get="/graphs/metrics?months=12" hx-trigger="load">
+                    <span class="spinner">Loading</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

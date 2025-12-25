@@ -1,7 +1,7 @@
 account_id,name,type,currency,risk
 yucho,ゆうちょ銀行,bank,JPY,0
 sony,ソニー銀行,bank,JPY,0
-deutsche,ドイツ銀行,bank,EUR,0
+deutsche,ドイツ銀行,bank,JPY,0
 minna,みんなの銀行,bank,JPY,0
 jonan,城南信用金庫,bank,JPY,0
 wise,WISE,fintech,multi,0
