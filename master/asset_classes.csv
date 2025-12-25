@@ -1,0 +1,9 @@
+class_id,name,risk_level
+cash,現金・預金,0
+stock_jp,日本株,1
+stock_us,米国株,1
+fund,投資信託,1
+fx,FX,1
+crypto,暗号資産,1
+pension,年金,0
+vc,VC,1

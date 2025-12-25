@@ -1,0 +1,13 @@
+account_id,name,type,currency,risk
+yucho,ゆうちょ銀行,bank,JPY,0
+sony,ソニー銀行,bank,JPY,0
+deutsche,ドイツ銀行,bank,EUR,0
+minna,みんなの銀行,bank,JPY,0
+jonan,城南信用金庫,bank,JPY,0
+wise,WISE,fintech,multi,0
+sbi_sec,SBI証券,securities,JPY,1
+rakuten_sec,楽天証券,securities,JPY,1
+monex_sec,マネックス証券,securities,JPY,1
+binance,Binance,crypto,multi,1
+kosei_nenkin,厚生年金,pension,JPY,0
+dc,確定拠出年金,pension,JPY,1

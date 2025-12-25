@@ -1,0 +1,31 @@
+version: '3'
+
+silent: true
+
+tasks:
+  default:
+    cmds:
+      - task --list
+
+  run:
+    desc: Run the main application
+    cmds:
+      - uv run python -m src.infrastructure.cli
+
+  test:
+    desc: Run tests
+    cmds:
+      - uv run pytest
+
+  format:
+    desc: Format code
+    cmds:
+      - uv run ruff check --fix .
+      - uv run black .
+
+  lint:
+    desc: Lint code
+    cmds:
+      - uv run ruff check .
+      - uv run mypy src
+
