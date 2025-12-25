@@ -65,24 +65,28 @@ All data originates from CSV files as defined in [schemas.md](../domain/schemas.
     - `net_savings` (Line overlay or Separate Bar)
 - **Reference**: See [bsplcf.md](../logics/bsplcf.md) for calculation logic.
 
-### D. Investment Performance (Line Chart)
-- **Data Source**: `metrics.csv`, `balance_sheet.csv`.
-- **Metrics** (from [metrics.md](../logics/metrics.md)): 
-    - `investment_gain_loss` (Cumulative)
+### D. Financial Ratios (Line Chart)
+- **Data Source**: `metrics.csv`.
+- **Metrics**: 
+    - `savings_rate` (%)
+    - `risk_asset_ratio` (%)
+- **Unit**: Percentage (0-100%).
+
+### E. Investment Returns (Line Chart)
+- **Data Source**: `metrics.csv`.
+- **Metrics**: 
     - `monthly_return` (ROI %)
-    - `monthly_alpha` (vs S&P 500 benchmark)
+    - `benchmark_return` (S&P 500 JPY %)
+    - `monthly_alpha` (Excess Return %)
+- **Unit**: Percentage (typically +/- 10%).
 
-### E. Savings Rate Trend (Line/Bar Chart)
+### F. Financial Independence (FI) Ratios (Line Chart)
 - **Data Source**: `metrics.csv`.
-- **X-Axis**: `month`
-- **Y-Axis**: `savings_rate` (%)
-- **Goal Line**: Optional target (e.g., 30%)
-
-### F. Risk Asset Ratio Trend (Line/Area Chart)
-- **Data Source**: `metrics.csv`.
-- **X-Axis**: `month`
-- **Y-Axis**: `risk_asset_ratio` (%)
-- **Reference**: Indicates portfolio risk exposure over time.
+- **Metrics**: 
+    - `fi_ratio_12m` (Trailing 12m)
+    - `fi_ratio_48m` (Trailing 48m)
+    - `fi_ratio_next_12m` (Projected)
+- **Unit**: Ratio (Multiple of Expenses). Target is typically 25x.
 
 ## 5. Implementation Pattern
 

@@ -27,3 +27,7 @@ class FinancialMetrics:
     risk_asset_ratio: float
     monthly_return: float
     monthly_alpha: float
+    benchmark_return: float
+    fi_ratio_12m: float
+    fi_ratio_48m: float
+    fi_ratio_next_12m: float

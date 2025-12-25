@@ -205,16 +205,44 @@
                 </div>
             </div>
 
-            <!-- Metrics Chart -->
+            <!-- Ratios Chart -->
             <div class="card">
                 <div class="card-header">
-                    <span class="card-title">Financial Metrics</span>
+                    <span class="card-title">Financial Ratios</span>
                     <div class="btn-group">
-                        <button class="btn" hx-get="/graphs/metrics?months=12" hx-target="#metrics-graph">1Y</button>
-                        <button class="btn" hx-get="/graphs/metrics" hx-target="#metrics-graph">All</button>
+                        <button class="btn" hx-get="/graphs/ratios?months=12" hx-target="#ratios-graph">1Y</button>
+                        <button class="btn" hx-get="/graphs/ratios" hx-target="#ratios-graph">All</button>
                     </div>
                 </div>
-                <div id="metrics-graph" class="graph-container" hx-get="/graphs/metrics?months=12" hx-trigger="load">
+                <div id="ratios-graph" class="graph-container" hx-get="/graphs/ratios?months=12" hx-trigger="load">
+                    <span class="spinner">Loading</span>
+                </div>
+            </div>
+
+            <!-- Returns Chart -->
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-title">Investment Returns</span>
+                    <div class="btn-group">
+                        <button class="btn" hx-get="/graphs/returns?months=12" hx-target="#returns-graph">1Y</button>
+                        <button class="btn" hx-get="/graphs/returns" hx-target="#returns-graph">All</button>
+                    </div>
+                </div>
+                <div id="returns-graph" class="graph-container" hx-get="/graphs/returns?months=12" hx-trigger="load">
+                    <span class="spinner">Loading</span>
+                </div>
+            </div>
+
+            <!-- FI Chart -->
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-title">FI Ratios (FIRE Progress)</span>
+                    <div class="btn-group">
+                        <button class="btn" hx-get="/graphs/fi?months=12" hx-target="#fi-graph">1Y</button>
+                        <button class="btn" hx-get="/graphs/fi" hx-target="#fi-graph">All</button>
+                    </div>
+                </div>
+                <div id="fi-graph" class="graph-container" hx-get="/graphs/fi?months=12" hx-trigger="load">
                     <span class="spinner">Loading</span>
                 </div>
             </div>

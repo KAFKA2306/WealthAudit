@@ -39,11 +39,23 @@ def create_app() -> Flask:
         months = request.args.get("months", type=int)
         return graph_service.get_allocation_chart(months)
 
-    @app.route("/graphs/metrics")
-    def metrics_graph() -> str:
-        """Return metrics chart HTML fragment."""
+    @app.route("/graphs/ratios")
+    def ratios_graph() -> str:
+        """Return financial ratios chart HTML fragment."""
         months = request.args.get("months", type=int)
-        return graph_service.get_metrics_chart(months)
+        return graph_service.get_ratios_chart(months)
+
+    @app.route("/graphs/returns")
+    def returns_graph() -> str:
+        """Return investment returns chart HTML fragment."""
+        months = request.args.get("months", type=int)
+        return graph_service.get_returns_chart(months)
+
+    @app.route("/graphs/fi")
+    def fi_graph() -> str:
+        """Return FI ratios chart HTML fragment."""
+        months = request.args.get("months", type=int)
+        return graph_service.get_fi_chart(months)
 
     return app
 

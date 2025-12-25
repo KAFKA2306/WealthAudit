@@ -182,12 +182,12 @@ class GraphService:
 
         return cast(str, fig.to_html(full_html=False, include_plotlyjs="cdn"))
 
-    def get_metrics_chart(self, months: Optional[int] = None) -> str:
-        """Generate line chart for financial metrics."""
+    def get_ratios_chart(self, months: Optional[int] = None) -> str:
+        """Generate line chart for savings rate and risk asset ratio."""
         df = self._load_csv("metrics.csv")
         df = self._filter_months(df, months)
 
-        fig = make_subplots(specs=[[{"secondary_y": True}]])
+        fig = go.Figure()
 
         fig.add_trace(
             go.Scatter(
@@ -196,8 +196,7 @@ class GraphService:
                 name="Savings Rate (%)",
                 mode="lines+markers",
                 line=dict(color="rgba(59, 130, 246, 1)", width=2),
-            ),
-            secondary_y=False,
+            )
         )
 
         fig.add_trace(
@@ -207,32 +206,135 @@ class GraphService:
                 name="Risk Asset Ratio (%)",
                 mode="lines+markers",
                 line=dict(color="rgba(16, 185, 129, 1)", width=2),
-            ),
-            secondary_y=False,
-        )
-
-        fig.add_trace(
-            go.Scatter(
-                x=df["month"],
-                y=df["monthly_alpha"] * 100,
-                name="Monthly Alpha (%)",
-                mode="lines+markers",
-                line=dict(color="rgba(139, 92, 246, 1)", width=2),
-            ),
-            secondary_y=True,
+            )
         )
 
         fig.update_layout(
-            title="Financial Metrics",
+            title="Financial Ratios (%)",
             hovermode="x unified",
             template="plotly_white",
             margin=dict(l=40, r=40, t=60, b=40),
             legend=dict(
                 orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1
             ),
+            yaxis=dict(title="Ratio (%)"),
         )
 
-        fig.update_yaxes(title_text="Ratio (%)", secondary_y=False)
-        fig.update_yaxes(title_text="Alpha (%)", secondary_y=True)
+        return cast(str, fig.to_html(full_html=False, include_plotlyjs="cdn"))
+
+    def get_returns_chart(self, months: Optional[int] = None) -> str:
+        """Generate line chart for investment returns."""
+        df = self._load_csv("metrics.csv")
+        df = self._filter_months(df, months)
+
+        fig = go.Figure()
+
+        fig.add_trace(
+            go.Scatter(
+                x=df["month"],
+                y=df["monthly_return"] * 100,
+                name="Monthly Return (%)",
+                mode="lines+markers",
+                line=dict(color="rgba(59, 130, 246, 1)", width=2),
+            )
+        )
+
+        fig.add_trace(
+            go.Scatter(
+                x=df["month"],
+                y=df["benchmark_return"] * 100,
+                name="Benchmark Return (%)",
+                mode="lines+markers",
+                line=dict(color="rgba(148, 163, 184, 1)", width=2, dash="dot"),
+            )
+        )
+
+        fig.add_trace(
+            go.Scatter(
+                x=df["month"],
+                y=df["monthly_alpha"] * 100,
+                name="Alpha (%)",
+                mode="lines+markers",
+                line=dict(color="rgba(139, 92, 246, 1)", width=2),
+            )
+        )
+
+        fig.update_layout(
+            title="Investment Performance (%)",
+            hovermode="x unified",
+            template="plotly_white",
+            margin=dict(l=40, r=40, t=60, b=40),
+            legend=dict(
+                orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1
+            ),
+            yaxis=dict(title="Return (%)"),
+        )
+
+        return cast(str, fig.to_html(full_html=False, include_plotlyjs="cdn"))
+
+    def get_fi_chart(self, months: Optional[int] = None) -> str:
+        """Generate line chart for Financial Independence ratios."""
+        df = self._load_csv("metrics.csv")
+        df = self._filter_months(df, months)
+
+        fig = go.Figure()
+
+        fig.add_trace(
+            go.Scatter(
+                x=df["month"],
+                y=df["fi_ratio_12m"],
+                name="FI Ratio (12m)",
+                mode="lines+markers",
+                line=dict(color="rgba(59, 130, 246, 1)", width=2),
+            )
+        )
+
+        fig.add_trace(
+            go.Scatter(
+                x=df["month"],
+                y=df["fi_ratio_48m"],
+                name="FI Ratio (48m)",
+                mode="lines+markers",
+                line=dict(color="rgba(16, 185, 129, 1)", width=2),
+            )
+        )
+
+        fig.add_trace(
+            go.Scatter(
+                x=df["month"],
+                y=df["fi_ratio_next_12m"],
+                name="FI Ratio (Proj)",
+                mode="lines+markers",
+                line=dict(color="rgba(245, 158, 11, 1)", width=2, dash="dot"),
+            )
+        )
+
+        fig.update_layout(
+            title="Financial Independence Ratio (Years Covered)",
+            hovermode="x unified",
+            template="plotly_white",
+            margin=dict(l=40, r=40, t=60, b=40),
+            legend=dict(
+                orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1
+            ),
+            yaxis=dict(title="Ratio (x Expenses)"),
+            shapes=[
+                dict(
+                    type="line",
+                    yref="y",
+                    y0=1.0,
+                    y1=1.0,
+                    xref="paper",
+                    x0=0,
+                    x1=1,
+                    line=dict(
+                        color="rgba(239, 68, 68, 0.5)",
+                        width=2,
+                        dash="dashdot",
+                    ),
+                    name="FIRE Target (100%)"
+                )
+            ]
+        )
 
         return cast(str, fig.to_html(full_html=False, include_plotlyjs="cdn"))

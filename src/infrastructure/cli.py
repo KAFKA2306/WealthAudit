@@ -14,7 +14,7 @@ from src.use_cases.calculators.metrics import MetricsCalculator
 
 
 def main() -> None:
-    import os
+    root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
     injector = Injector([AppModule(root_dir)])
 
     # Repositories
@@ -90,6 +90,10 @@ def main() -> None:
                 "risk_asset_ratio": m.risk_asset_ratio,
                 "monthly_return": m.monthly_return,
                 "monthly_alpha": m.monthly_alpha,
+                "benchmark_return": m.benchmark_return,
+                "fi_ratio_12m": m.fi_ratio_12m,
+                "fi_ratio_48m": m.fi_ratio_48m,
+                "fi_ratio_next_12m": m.fi_ratio_next_12m,
             }
         )
     pd.DataFrame(metrics_data).to_csv(
