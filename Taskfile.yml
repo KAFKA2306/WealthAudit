@@ -49,7 +49,7 @@ tasks:
       - uv run python scripts/export_normalized.py
 
   forecast:
-    desc: Generate 12-month financial forecast
+    desc: Generate 30-year financial forecast
     cmds:
       - uv run python scripts/forecast.py
 

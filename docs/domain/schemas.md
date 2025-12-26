@@ -15,10 +15,17 @@
 │   │   ├── expense.csv
 │   │   ├── assets.csv
 │   │   └── market.csv
-│   ├── calculated/      # 自動計算（システム責任、中間生成物）
-│   └── views/           # 集計ビュー（出力物）
+│   └── calculated/      # 自動計算（システム責任）
+│       ├── cashflow.csv
+│       ├── balance_sheet.csv
+│       ├── metrics.csv
+│       ├── normalized.csv
+│       ├── forecast.csv
+│       ├── forecast_annual.csv
+│       └── forecast_parameters.csv
 ├── master/              # マスタデータ
 │   ├── accounts.csv
+│   ├── asset_classes.csv
 │   └── payment_methods.csv
 ```
 

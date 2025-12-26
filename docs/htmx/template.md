@@ -46,10 +46,10 @@ The dashboard uses HTMX for dynamic content loading without custom JavaScript.
 ```
 dashboard
 ├── header (title, subtitle)
-└── grid (2x2)
+└── grid (2x3)
     ├── Net Worth Trend
-    ├── Cash Flow
-    ├── Asset Allocation
+    ├── Cash Flow (6-month moving average)
+    ├── Asset Allocation (100% stacked bar)
     ├── Financial Ratios
     ├── Investment Returns
     └── FI Ratios

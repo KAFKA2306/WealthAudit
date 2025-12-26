@@ -45,6 +45,13 @@ Contains master data for accounts.
 - `currency`: The currency of the account (e.g., `JPY`, `USD`).
 - `risk`: A flag indicating if the account holds risk assets (1 for true, 0 for false).
 
+### `asset_classes.csv`
+Contains master data for asset classifications.
+
+- `class_id`: The unique ID of the asset class.
+- `name`: The Japanese name of the asset class.
+- `risk_level`: Risk classification (0 = safe, 1 = risk asset).
+
 ### `payment_methods.csv`
 Contains master data for payment methods.
 

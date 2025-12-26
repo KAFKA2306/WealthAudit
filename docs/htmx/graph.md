@@ -30,9 +30,10 @@ All data originates from CSV files as defined in [schemas.md](../domain/schemas.
 ### Calculated Files (`data/calculated/`)
 | File | Description | Key Columns |
 |------|-------------|-------------|
-| `cashflow.csv` | Cash Flow Statement | `month`, `income`, `expenses`, `net_savings` |
-| `balance_sheet.csv` | Balance Sheet | `month`, `liquid_assets`, `risk_assets`, `pension_assets`, `total_financial_assets`, `investment_gain_loss` |
-| `metrics.csv` | Financial Metrics | `month`, `savings_rate`, `risk_asset_ratio`, `monthly_return`, `monthly_alpha` |
+| `forecast.csv` | **Primary data source for all graphs** (history + 30-year projection) | All columns from cashflow, balance_sheet, metrics |
+| `cashflow.csv` | Cash Flow Statement (legacy) | `month`, `after_tax_income`, `expenditure`, `net_savings` |
+| `balance_sheet.csv` | Balance Sheet (legacy) | `month`, `liquid_assets`, `risk_assets`, `pension_assets`, `total_financial_assets`, `investment_gain_loss` |
+| `metrics.csv` | Financial Metrics (legacy) | `month`, `savings_rate`, `risk_asset_ratio`, `monthly_return`, `monthly_alpha` |
 
 ### Master Files (`master/`)
 | File | Description | Key Columns |
@@ -57,12 +58,14 @@ All data originates from CSV files as defined in [schemas.md](../domain/schemas.
 - **Interaction**: Date range selector triggered via `hx-get="/graphs/net-worth?range=..."` targeting the graph container.
 
 ### C. Monthly Cash Flow (Bar Chart)
-- **Data Source**: `cashflow.csv` (Time series).
+- **Data Source**: `forecast.csv` (Time series).
 - **X-Axis**: `month`
 - **Y-Axis**: 
-    - `income` (Positive Bar)
-    - `expenses` (Negative Bar)
-    - `net_savings` (Line overlay or Separate Bar)
+    - `after_tax_income` (Positive Bar, Green)
+    - `expenditure` (Negative Bar, Red)
+    - `investment_gain_loss` (Bar, Purple)
+    - `total_flow` = `net_savings + investment_gain_loss` (Line, Blue)
+- **Moving Averages**: 12-month (Income, Total Flow)
 - **Reference**: See [bsplcf.md](../logics/bsplcf.md) for calculation logic.
 
 ### D. Financial Ratios (Line Chart)
@@ -99,8 +102,9 @@ All data originates from CSV files as defined in [schemas.md](../domain/schemas.
 </div>
 
 <!-- Controls -->
-<button hx-get="/graphs/net-worth?range=12m" hx-target="#graph-container">1Y</button>
-<button hx-get="/graphs/net-worth?range=all" hx-target="#graph-container">All</button>
+<button hx-get="/graphs/net-worth?months=12" hx-target="#graph-container">1Y</button>
+<button hx-get="/graphs/net-worth" hx-target="#graph-container">All</button>
+<button hx-get="/graphs/net-worth?forecast=60" hx-target="#graph-container">+5Y</button>
 ```
 
 ### Backend Logic
@@ -110,19 +114,61 @@ The backend handler should:
 3. Generate Plotly Figure.
 4. Return `fig.to_html(full_html=False, include_plotlyjs='cdn')`.
 
-### File Structure (Proposed)
+### File Structure (Implemented)
 ```
 src/
 ├── infrastructure/
-│   └── web.py          # HTMX server endpoints
-├── application/
-│   └── graph_service.py  # Graph generation logic
+│   └── web.py              # Flask server with HTMX endpoints
+├── use_cases/
+│   └── graph_service.py    # Plotly chart generation
 └── domain/
-    └── entities/        # Existing models (BalanceSheet, CashFlowStatement, etc.)
+    └── entities/           # Data models (BalanceSheet, CashFlowStatement, etc.)
+
+templates/
+├── dashboard.html          # Main dashboard with HTMX
+└── input.html              # Data entry form
 ```
 
-## 6. Next Steps
-1. Prototype a simple web server (e.g., `src/infrastructure/web.py`) if not already present.
-2. Implement `/graphs/*` endpoints for each proposed graph.
-3. Design a dashboard template with HTMX controls.
-4. Add graph generation tests.
+## 6. Forecast Toggle Feature
+
+将来予測データの表示/非表示を切り替える機能。
+
+### Query Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `months` | int | 過去Nヶ月のデータを表示（例: `?months=12`）|
+| `forecast` | int | 現在月からNヶ月先までの予測を表示（例: `?forecast=60`）|
+
+### Usage Examples
+
+```html
+<!-- 過去1年 -->
+<button hx-get="/graphs/net-worth?months=12">1Y</button>
+
+<!-- 全履歴（実績のみ）-->
+<button hx-get="/graphs/net-worth">All</button>
+
+<!-- 将来5年予測 -->
+<button hx-get="/graphs/net-worth?forecast=60">+5Y</button>
+
+<!-- 将来10年予測 -->
+<button hx-get="/graphs/net-worth?forecast=120">+10Y</button>
+```
+
+### Data Source
+
+- 予測データは `data/calculated/forecast.csv` から取得
+- 30年分（360ヶ月）の予測データが含まれる
+- 詳細は [forecast.md](../logics/forecast.md) 参照
+
+## 7. Implementation Status
+
+All proposed graphs are implemented:
+- ✅ Net Worth Trend (stacked bar)
+- ✅ Cash Flow (bar chart with 6-month moving average)
+- ✅ Asset Allocation (100% stacked bar)
+- ✅ Financial Ratios (line chart)
+- ✅ Investment Returns (line chart)
+- ✅ FI Ratios (line chart)
+- ✅ Forecast Toggle (+5Y buttons)

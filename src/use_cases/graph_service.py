@@ -15,20 +15,25 @@ class GraphService:
     data_dir: str
 
     def _load_csv(self, filename: str) -> pd.DataFrame:
-        """Load a CSV file from the calculated data directory."""
         path = os.path.join(self.data_dir, "data", "calculated", filename)
         return pd.read_csv(path)
 
-    def _filter_months(self, df: pd.DataFrame, months: Optional[int]) -> pd.DataFrame:
-        """Filter dataframe to last N months if specified."""
-        if months is not None and len(df) > months:
-            return df.tail(months)
-        return df
+    def _filter_data(
+        self, df: pd.DataFrame, months: Optional[int], forecast: Optional[int]
+    ) -> pd.DataFrame:
+        current = "2025-12"
+        if forecast:
+            start = (pd.to_datetime(current) - pd.DateOffset(months=12)).strftime("%Y-%m")
+            end = (pd.to_datetime(current) + pd.DateOffset(months=forecast)).strftime("%Y-%m")
+            return df[(df["month"] >= start) & (df["month"] <= end)]
+        if months:
+            return df[df["month"] <= current].tail(months)
+        return df[df["month"] <= current]
 
-    def get_net_worth_chart(self, months: Optional[int] = None) -> str:
+    def get_net_worth_chart(self, months: Optional[int] = None, forecast: Optional[int] = None) -> str:
         """Generate stacked bar chart for net worth trend."""
-        df = self._load_csv("balance_sheet.csv")
-        df = self._filter_months(df, months)
+        df = self._load_csv("forecast.csv")
+        df = self._filter_data(df, months, forecast)
 
         fig = go.Figure()
 
@@ -60,28 +65,26 @@ class GraphService:
         )
 
         fig.update_layout(
-            title="Net Worth Trend (万円)",
+            title=dict(text="Net Worth Trend (万円)", y=0.98, x=0.5, xanchor="center"),
             xaxis_title="Month",
             yaxis_title="Amount (万円)",
             barmode="stack",
             hovermode="x unified",
             template="plotly_white",
-            margin=dict(l=40, r=40, t=60, b=40),
+            margin=dict(l=40, r=40, t=100, b=40),
             legend=dict(
-                orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1
+                orientation="h", yanchor="bottom", y=1.05, xanchor="right", x=1
             ),
         )
 
         return cast(str, fig.to_html(full_html=False, include_plotlyjs="cdn"))
 
-    def get_cashflow_chart(self, months: Optional[int] = None) -> str:
+    def get_cashflow_chart(self, months: Optional[int] = None, forecast: Optional[int] = None) -> str:
         """Generate bar chart for monthly cash flow."""
-        df = self._load_csv("cashflow.csv")
-        df = self._filter_months(df, months)
+        df = self._load_csv("forecast.csv")
+        df = self._filter_data(df, months, forecast)
 
-        # Calculate 6-month moving averages
-        income_6ma = df["after_tax_income"].rolling(window=6, min_periods=1).mean()
-        net_savings_6ma = df["net_savings"].rolling(window=6, min_periods=1).mean()
+        income_12ma = df["after_tax_income"].rolling(window=12, min_periods=1).mean()
 
         fig = go.Figure()
 
@@ -97,8 +100,8 @@ class GraphService:
         fig.add_trace(
             go.Scatter(
                 x=df["month"],
-                y=income_6ma,
-                name="Income (6MA)",
+                y=income_12ma,
+                name="Income (12MA)",
                 mode="lines",
                 line=dict(color="rgba(16, 185, 129, 1)", width=3, dash="dash"),
             )
@@ -114,10 +117,22 @@ class GraphService:
         )
 
         fig.add_trace(
+            go.Bar(
+                x=df["month"],
+                y=df["investment_gain_loss"],
+                name="Investment G/L",
+                marker_color="rgba(139, 92, 246, 0.8)",
+            )
+        )
+
+        total_flow = df["net_savings"] + df["investment_gain_loss"]
+        total_flow_12ma = total_flow.rolling(window=12, min_periods=1).mean()
+
+        fig.add_trace(
             go.Scatter(
                 x=df["month"],
-                y=df["net_savings"],
-                name="Net Savings",
+                y=total_flow,
+                name="Total Flow",
                 mode="lines+markers",
                 line=dict(color="rgba(59, 130, 246, 1)", width=2),
                 marker=dict(size=6),
@@ -127,32 +142,33 @@ class GraphService:
         fig.add_trace(
             go.Scatter(
                 x=df["month"],
-                y=net_savings_6ma,
-                name="Net Savings (6MA)",
+                y=total_flow_12ma,
+                name="Total Flow (12MA)",
                 mode="lines",
                 line=dict(color="rgba(245, 158, 11, 1)", width=3, dash="dash"),
             )
         )
 
+
         fig.update_layout(
-            title="Monthly Cash Flow (万円)",
+            title=dict(text="Monthly Cash Flow (万円)", y=0.98, x=0.5, xanchor="center"),
             xaxis_title="Month",
             yaxis_title="Amount (万円)",
             barmode="relative",
             hovermode="x unified",
             template="plotly_white",
-            margin=dict(l=40, r=40, t=60, b=40),
+            margin=dict(l=40, r=40, t=100, b=40),
             legend=dict(
-                orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1
+                orientation="h", yanchor="bottom", y=1.05, xanchor="right", x=1
             ),
         )
 
         return cast(str, fig.to_html(full_html=False, include_plotlyjs="cdn"))
 
-    def get_allocation_chart(self, months: Optional[int] = None) -> str:
+    def get_allocation_chart(self, months: Optional[int] = None, forecast: Optional[int] = None) -> str:
         """Generate 100% stacked bar chart for asset allocation trend."""
-        df = self._load_csv("balance_sheet.csv")
-        df = self._filter_months(df, months)
+        df = self._load_csv("forecast.csv")
+        df = self._filter_data(df, months, forecast)
 
         # Calculate percentages
         total = df["liquid_assets"] + df["risk_assets"] + df["pension_assets"]
@@ -190,25 +206,25 @@ class GraphService:
         )
 
         fig.update_layout(
-            title="Asset Allocation (%)",
+            title=dict(text="Asset Allocation (%)", y=0.98, x=0.5, xanchor="center"),
             xaxis_title="Month",
             yaxis_title="Ratio (%)",
             barmode="stack",
             hovermode="x unified",
             template="plotly_white",
-            margin=dict(l=40, r=40, t=60, b=40),
+            margin=dict(l=40, r=40, t=100, b=40),
             legend=dict(
-                orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1
+                orientation="h", yanchor="bottom", y=1.05, xanchor="right", x=1
             ),
             yaxis=dict(range=[0, 100]),
         )
 
         return cast(str, fig.to_html(full_html=False, include_plotlyjs="cdn"))
 
-    def get_ratios_chart(self, months: Optional[int] = None) -> str:
+    def get_ratios_chart(self, months: Optional[int] = None, forecast: Optional[int] = None) -> str:
         """Generate line chart for savings rate and risk asset ratio."""
-        df = self._load_csv("metrics.csv")
-        df = self._filter_months(df, months)
+        df = self._load_csv("forecast.csv")
+        df = self._filter_data(df, months, forecast)
 
         fig = go.Figure()
 
@@ -233,22 +249,22 @@ class GraphService:
         )
 
         fig.update_layout(
-            title="Financial Ratios (%)",
+            title=dict(text="Financial Ratios (%)", y=0.98, x=0.5, xanchor="center"),
             hovermode="x unified",
             template="plotly_white",
-            margin=dict(l=40, r=40, t=60, b=40),
+            margin=dict(l=40, r=40, t=100, b=40),
             legend=dict(
-                orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1
+                orientation="h", yanchor="bottom", y=1.05, xanchor="right", x=1
             ),
             yaxis=dict(title="Ratio (%)"),
         )
 
         return cast(str, fig.to_html(full_html=False, include_plotlyjs="cdn"))
 
-    def get_returns_chart(self, months: Optional[int] = None) -> str:
+    def get_returns_chart(self, months: Optional[int] = None, forecast: Optional[int] = None) -> str:
         """Generate line chart for investment returns."""
-        df = self._load_csv("metrics.csv")
-        df = self._filter_months(df, months)
+        df = self._load_csv("forecast.csv")
+        df = self._filter_data(df, months, forecast)
 
         fig = go.Figure()
 
@@ -283,22 +299,22 @@ class GraphService:
         )
 
         fig.update_layout(
-            title="Investment Performance (%)",
+            title=dict(text="Investment Performance (%)", y=0.98, x=0.5, xanchor="center"),
             hovermode="x unified",
             template="plotly_white",
-            margin=dict(l=40, r=40, t=60, b=40),
+            margin=dict(l=40, r=40, t=100, b=40),
             legend=dict(
-                orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1
+                orientation="h", yanchor="bottom", y=1.05, xanchor="right", x=1
             ),
             yaxis=dict(title="Return (%)"),
         )
 
         return cast(str, fig.to_html(full_html=False, include_plotlyjs="cdn"))
 
-    def get_fi_chart(self, months: Optional[int] = None) -> str:
+    def get_fi_chart(self, months: Optional[int] = None, forecast: Optional[int] = None) -> str:
         """Generate line chart for Financial Independence ratios."""
-        df = self._load_csv("metrics.csv")
-        df = self._filter_months(df, months)
+        df = self._load_csv("forecast.csv")
+        df = self._filter_data(df, months, forecast)
 
         fig = go.Figure()
 
@@ -333,12 +349,12 @@ class GraphService:
         )
 
         fig.update_layout(
-            title="Financial Independence Ratio (Years Covered)",
+            title=dict(text="Financial Independence Ratio (Years Covered)", y=0.98, x=0.5, xanchor="center"),
             hovermode="x unified",
             template="plotly_white",
-            margin=dict(l=40, r=40, t=60, b=40),
+            margin=dict(l=40, r=40, t=100, b=40),
             legend=dict(
-                orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1
+                orientation="h", yanchor="bottom", y=1.05, xanchor="right", x=1
             ),
             yaxis=dict(title="Ratio (x Expenses)"),
             shapes=[

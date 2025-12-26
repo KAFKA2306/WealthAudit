@@ -397,6 +397,119 @@ def calculate_metrics_vectorized(df: pd.DataFrame, geo_return_rate: float) -> pd
     return df
 
 
+def get_calendar_year(month_str: str) -> int:
+    """Get calendar year from 'YYYY-MM' string."""
+    return int(month_str.split("-")[0])
+
+
+def export_annual_summary(df: pd.DataFrame, output_dir: Path) -> None:
+    """
+    Aggregate forecast data by Calendar Year and export summary.
+    Calendar Year: January to December.
+    Flows: Sum
+    Stocks: Last value
+    Metrics: Recalculated
+    """
+    df = df.copy()
+    df["year"] = df["month"].apply(get_calendar_year)
+    
+    # Define aggregation rules
+    # 1. Flows (Sum)
+    inc_cols = [c for c in df.columns if c.startswith("収入_")]
+    exp_cols = [c for c in df.columns if c.startswith("支出_")]
+    flow_cols = inc_cols + exp_cols + ["after_tax_income", "expenditure", "net_savings", "investment_gain_loss"]
+    
+    # 2. Stocks (Last)
+    cls_cols = [c for c in df.columns if c.startswith("分類_")]
+    ast_cols = [c for c in df.columns if c.startswith("資産_")]
+    stock_cols = cls_cols + ast_cols + ["liquid_assets", "risk_assets", "pension_assets", "total_financial_assets"]
+    
+    # Group by FY
+    grouped = df.groupby("year")
+    
+    annual_flows = grouped[flow_cols].sum()
+    annual_stocks = grouped[stock_cols].last()
+    
+    # Combine
+    annual = pd.concat([annual_flows, annual_stocks], axis=1)
+    
+    # Recalculate Metrics
+    # Savings Rate
+    annual["savings_rate"] = 0.0
+    mask = annual["after_tax_income"] != 0
+    annual.loc[mask, "savings_rate"] = annual.loc[mask, "net_savings"] / annual.loc[mask, "after_tax_income"]
+    
+    # Risk Asset Ratio
+    annual["risk_asset_ratio"] = 0.0
+    mask = annual["total_financial_assets"] != 0
+    annual.loc[mask, "risk_asset_ratio"] = (
+        annual.loc[mask, "risk_assets"] + annual.loc[mask, "pension_assets"]
+    ) / annual.loc[mask, "total_financial_assets"]
+    
+    # Annual Return (Approximate or TTM style from monthly?)
+    # Simple approach: Sum(Gain) / Start(Risk) -> but risk fluctuates.
+    # Better: Geometric linking of monthly returns.
+    # We need to process grouping to get geo mean of returns.
+    
+    def calc_annual_geo_return(group):
+        if "monthly_return" not in group.columns:
+            return 0.0
+        # (1+r1)*(1+r2)... - 1
+        return np.prod(1 + group["monthly_return"]) - 1
+        
+    annual_returns = grouped.apply(calc_annual_geo_return)
+    annual["annual_return"] = annual_returns
+    
+    # Reset index to make 'year' a column
+    annual = annual.reset_index()
+    
+    # Rounding (Same rules as forecast.csv)
+    # Yen cols: 1000 round
+    yen_prefixes = ("収入_", "支出_", "分類_", "資産_")
+    numeric_cols = annual.select_dtypes(include=["float64", "int64"]).columns
+    yen_cols = [c for c in numeric_cols if c.startswith(yen_prefixes)]
+    
+    # Others (Man-yen, Ratios): 4 sig figs
+    # Note: Annual flows for income/expense are huge, Man-yen assets are large.
+    sig_fig_cols = [c for c in numeric_cols if c not in yen_cols and c != "year"]
+    
+    for col in yen_cols:
+        annual[col] = annual[col].apply(
+            lambda x: round(x / 1000) * 1000 if pd.notna(x) else x
+        )
+        
+    for col in sig_fig_cols:
+        annual[col] = annual[col].apply(
+            lambda x: float(f"{x:.4g}") if pd.notna(x) and x != 0 else x
+        )
+    
+    # Reorder columns: year, 収入, 支出, cashflow, 資産, 分類, BS, metrics
+    inc_cols_sorted = sorted([c for c in annual.columns if c.startswith("収入_")])
+    exp_cols_sorted = sorted([c for c in annual.columns if c.startswith("支出_")])
+    ast_cols_sorted = sorted([c for c in annual.columns if c.startswith("資産_")])
+    cls_cols_sorted = sorted([c for c in annual.columns if c.startswith("分類_")])
+    
+    cashflow_cols = ["after_tax_income", "expenditure", "net_savings"]
+    bs_cols = ["liquid_assets", "risk_assets", "pension_assets", "total_financial_assets", "investment_gain_loss"]
+    metric_cols = ["savings_rate", "risk_asset_ratio", "annual_return"]
+    
+    col_order = ["year"] + inc_cols_sorted + exp_cols_sorted
+    col_order += [c for c in cashflow_cols if c in annual.columns]
+    col_order += ast_cols_sorted + cls_cols_sorted  # 資産 before 分類
+    col_order += [c for c in bs_cols if c in annual.columns]
+    col_order += [c for c in metric_cols if c in annual.columns]
+    
+    remaining = [c for c in annual.columns if c not in col_order]
+    col_order += remaining
+    
+    annual = annual[col_order]
+        
+    # Export
+    output_path = output_dir / "forecast_annual.csv"
+    annual.to_csv(output_path, index=False)
+    print(f"Exported annual summary to: {output_path}")
+
+
 def main() -> None:
     """Generate 30-year financial forecast and concatenate with historical data."""
     base_dir = Path(__file__).parent.parent
@@ -709,6 +822,9 @@ def main() -> None:
     print(f"Historical period: {history['month'].min()} to {history['month'].max()}")
     print(f"Forecast period: {future_months[0]} to {future_months[-1]}")
     print(f"Total rows: {len(combined)} (historical: {len(history)}, forecast: {len(forecast)})")
+    
+    # Generate Annual Summary
+    export_annual_summary(combined, calculated_dir)
     
     # Sanity check metrics
     tail_metrics = combined[["month", "savings_rate", "risk_asset_ratio", "fi_ratio_12m"]].tail()

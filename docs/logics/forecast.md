@@ -192,3 +192,25 @@ investment_gain_loss = total_t - total_{t-1} - net_savings
 | `std(x, n)` | 過去n期間の標準偏差 |
 | `cv(x, n)` | 変動係数 = std / mean |
 | `geometric_mean(r, n)` | 幾何平均リターン |
+
+## Dashboard表示
+
+### 予測データのトグル表示
+
+ダッシュボードでは、将来予測データの表示/非表示を切り替えることができます。
+
+```html
+<!-- 履歴のみ -->
+<button hx-get="/graphs/net-worth">All</button>
+
+<!-- 将来5年予測を追加表示 -->
+<button hx-get="/graphs/net-worth?forecast=60">+5Y</button>
+```
+
+| パラメータ | 値 | 説明 |
+|-----------|-----|------|
+| `forecast` | 60 | 5年分（60ヶ月）の予測を表示 |
+| `forecast` | 120 | 10年分（120ヶ月）の予測を表示 |
+| `forecast` | 360 | 30年分（全予測）を表示 |
+
+詳細は [htmx/graph.md](../htmx/graph.md#6-forecast-toggle-feature) 参照。

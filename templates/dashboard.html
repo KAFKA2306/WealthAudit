@@ -169,6 +169,7 @@
                         <button class="btn" hx-get="/graphs/net-worth?months=12"
                             hx-target="#net-worth-graph">1Y</button>
                         <button class="btn" hx-get="/graphs/net-worth" hx-target="#net-worth-graph">All</button>
+                        <button class="btn" hx-get="/graphs/net-worth?forecast=60" hx-target="#net-worth-graph">+5Y</button>
                     </div>
                 </div>
                 <div id="net-worth-graph" class="graph-container" hx-get="/graphs/net-worth" hx-trigger="load">
@@ -183,6 +184,7 @@
                     <div class="btn-group">
                         <button class="btn" hx-get="/graphs/cashflow?months=12" hx-target="#cashflow-graph">1Y</button>
                         <button class="btn" hx-get="/graphs/cashflow" hx-target="#cashflow-graph">All</button>
+                        <button class="btn" hx-get="/graphs/cashflow?forecast=60" hx-target="#cashflow-graph">+5Y</button>
                     </div>
                 </div>
                 <div id="cashflow-graph" class="graph-container" hx-get="/graphs/cashflow" hx-trigger="load">
@@ -198,6 +200,7 @@
                         <button class="btn" hx-get="/graphs/allocation?months=12"
                             hx-target="#allocation-graph">1Y</button>
                         <button class="btn" hx-get="/graphs/allocation" hx-target="#allocation-graph">All</button>
+                        <button class="btn" hx-get="/graphs/allocation?forecast=60" hx-target="#allocation-graph">+5Y</button>
                     </div>
                 </div>
                 <div id="allocation-graph" class="graph-container" hx-get="/graphs/allocation" hx-trigger="load">
@@ -212,6 +215,7 @@
                     <div class="btn-group">
                         <button class="btn" hx-get="/graphs/ratios?months=12" hx-target="#ratios-graph">1Y</button>
                         <button class="btn" hx-get="/graphs/ratios" hx-target="#ratios-graph">All</button>
+                        <button class="btn" hx-get="/graphs/ratios?forecast=60" hx-target="#ratios-graph">+5Y</button>
                     </div>
                 </div>
                 <div id="ratios-graph" class="graph-container" hx-get="/graphs/ratios" hx-trigger="load">
@@ -226,6 +230,7 @@
                     <div class="btn-group">
                         <button class="btn" hx-get="/graphs/returns?months=12" hx-target="#returns-graph">1Y</button>
                         <button class="btn" hx-get="/graphs/returns" hx-target="#returns-graph">All</button>
+                        <button class="btn" hx-get="/graphs/returns?forecast=60" hx-target="#returns-graph">+5Y</button>
                     </div>
                 </div>
                 <div id="returns-graph" class="graph-container" hx-get="/graphs/returns" hx-trigger="load">
@@ -240,6 +245,7 @@
                     <div class="btn-group">
                         <button class="btn" hx-get="/graphs/fi?months=12" hx-target="#fi-graph">1Y</button>
                         <button class="btn" hx-get="/graphs/fi" hx-target="#fi-graph">All</button>
+                        <button class="btn" hx-get="/graphs/fi?forecast=60" hx-target="#fi-graph">+5Y</button>
                     </div>
                 </div>
                 <div id="fi-graph" class="graph-container" hx-get="/graphs/fi" hx-trigger="load">

@@ -28,7 +28,8 @@ src/
     └── web.py              # Flask server
 
 templates/
-└── dashboard.html          # HTMX UI
+├── dashboard.html          # HTMX Dashboard UI
+└── input.html              # Data Entry Form
 ```
 
 ## Technology Stack

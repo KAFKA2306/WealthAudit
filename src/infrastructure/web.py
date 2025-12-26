@@ -253,37 +253,43 @@ def create_app() -> Flask:
     def net_worth_graph() -> str:
         """Return net worth chart HTML fragment."""
         months = request.args.get("months", type=int)
-        return graph_service.get_net_worth_chart(months)
+        forecast = request.args.get("forecast", type=int)
+        return graph_service.get_net_worth_chart(months, forecast)
 
     @app.route("/graphs/cashflow")
     def cashflow_graph() -> str:
         """Return cash flow chart HTML fragment."""
         months = request.args.get("months", type=int)
-        return graph_service.get_cashflow_chart(months)
+        forecast = request.args.get("forecast", type=int)
+        return graph_service.get_cashflow_chart(months, forecast)
 
     @app.route("/graphs/allocation")
     def allocation_graph() -> str:
         """Return asset allocation chart HTML fragment."""
         months = request.args.get("months", type=int)
-        return graph_service.get_allocation_chart(months)
+        forecast = request.args.get("forecast", type=int)
+        return graph_service.get_allocation_chart(months, forecast)
 
     @app.route("/graphs/ratios")
     def ratios_graph() -> str:
         """Return financial ratios chart HTML fragment."""
         months = request.args.get("months", type=int)
-        return graph_service.get_ratios_chart(months)
+        forecast = request.args.get("forecast", type=int)
+        return graph_service.get_ratios_chart(months, forecast)
 
     @app.route("/graphs/returns")
     def returns_graph() -> str:
         """Return investment returns chart HTML fragment."""
         months = request.args.get("months", type=int)
-        return graph_service.get_returns_chart(months)
+        forecast = request.args.get("forecast", type=int)
+        return graph_service.get_returns_chart(months, forecast)
 
     @app.route("/graphs/fi")
     def fi_graph() -> str:
         """Return FI ratios chart HTML fragment."""
         months = request.args.get("months", type=int)
-        return graph_service.get_fi_chart(months)
+        forecast = request.args.get("forecast", type=int)
+        return graph_service.get_fi_chart(months, forecast)
 
     return app
 
