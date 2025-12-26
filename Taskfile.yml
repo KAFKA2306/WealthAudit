@@ -15,17 +15,20 @@ tasks:
   test:
     desc: Run tests
     cmds:
+      - uv pip install -e .[dev]
       - uv run pytest
 
   format:
     desc: Format code
     cmds:
+      - uv pip install -e .[dev]
       - uv run ruff check --fix .
       - uv run black .
 
   lint:
     desc: Lint code
     cmds:
+      - uv pip install -e .[dev]
       - uv run ruff check .
       - uv run mypy src
 
@@ -39,4 +42,14 @@ tasks:
     desc: Start the dashboard web server
     cmds:
       - uv run python -m src.infrastructure.web
+
+  export:
+    desc: Export normalized CSV from all input/calculated data
+    cmds:
+      - uv run python scripts/export_normalized.py
+
+  forecast:
+    desc: Generate 12-month financial forecast
+    cmds:
+      - uv run python scripts/forecast.py
 

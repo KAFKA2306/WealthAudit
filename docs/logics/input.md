@@ -51,3 +51,25 @@ Contains master data for payment methods.
 - `method_id`: The unique ID of the payment method.
 - `name`: The name of the payment method.
 - `settlement_account`: The ID of the account from which the payment is settled. Can be empty.
+
+## Web Interface
+
+A web form is available to simplify monthly data entry.
+
+### Access
+```bash
+uv run python -m src.infrastructure.web
+# Navigate to http://localhost:5000/input
+```
+
+### Features
+- **Auto-fill**: Fixed items (Pension, DC) are pre-populated.
+- **Defaults**: Variable items show last month's values.
+- **Add/Remove**: Dynamically manage rows.
+- **Save**: Appends to `data/input/*.csv`.
+
+### Workflow
+1. Open `/input` at month-end.
+2. Update values and click **Save All Data**.
+3. Run CLI to recalculate: `uv run python -m src.infrastructure.cli`
+4. View dashboard at `/`.

@@ -62,6 +62,26 @@ Calculated files are exported to `data/calculated/`:
 - `cashflow.csv`: Monthly income and savings.
 - `balance_sheet.csv`: Asset breakdown and investment gains.
 - `metrics.csv`: Financial performance indicators.
+- `normalized.csv`: Consolidated table joining all input and calculated data.
+
+### Export Normalized Data
+Generate a single consolidated CSV with all financial data:
+
+```bash
+task export
+# OR
+uv run python scripts/export_normalized.py
+```
+
+### Financial Forecast
+Generate a 30-year financial forecast based on historical data:
+
+```bash
+task forecast
+# OR
+uv run python scripts/forecast.py
+```
+Output: `data/calculated/forecast.csv`
 
 ## Development
 

@@ -6,7 +6,6 @@ from typing import Optional, cast
 
 import pandas as pd
 import plotly.graph_objects as go
-from plotly.subplots import make_subplots
 
 
 @dataclass
@@ -80,6 +79,10 @@ class GraphService:
         df = self._load_csv("cashflow.csv")
         df = self._filter_months(df, months)
 
+        # Calculate 6-month moving averages
+        income_6ma = df["after_tax_income"].rolling(window=6, min_periods=1).mean()
+        net_savings_6ma = df["net_savings"].rolling(window=6, min_periods=1).mean()
+
         fig = go.Figure()
 
         fig.add_trace(
@@ -88,6 +91,16 @@ class GraphService:
                 y=df["after_tax_income"],
                 name="Income",
                 marker_color="rgba(16, 185, 129, 0.8)",
+            )
+        )
+
+        fig.add_trace(
+            go.Scatter(
+                x=df["month"],
+                y=income_6ma,
+                name="Income (6MA)",
+                mode="lines",
+                line=dict(color="rgba(16, 185, 129, 1)", width=3, dash="dash"),
             )
         )
 
@@ -108,6 +121,16 @@ class GraphService:
                 mode="lines+markers",
                 line=dict(color="rgba(59, 130, 246, 1)", width=2),
                 marker=dict(size=6),
+            )
+        )
+
+        fig.add_trace(
+            go.Scatter(
+                x=df["month"],
+                y=net_savings_6ma,
+                name="Net Savings (6MA)",
+                mode="lines",
+                line=dict(color="rgba(245, 158, 11, 1)", width=3, dash="dash"),
             )
         )
 
@@ -332,9 +355,9 @@ class GraphService:
                         width=2,
                         dash="dashdot",
                     ),
-                    name="FIRE Target (100%)"
+                    name="FIRE Target (100%)",
                 )
-            ]
+            ],
         )
 
         return cast(str, fig.to_html(full_html=False, include_plotlyjs="cdn"))

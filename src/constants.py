@@ -38,6 +38,8 @@ class PaymentMethodId(str, Enum):
     WISE = "wise"
     CASH = "cash"
     ADJUSTMENT = "adjustment"
+    RAKUTEN_JCB = "rakuten_jcb"
+    SMBC_NUMBERLESS = "smbc_numberless"
 
 
 class AccountType(str, Enum):

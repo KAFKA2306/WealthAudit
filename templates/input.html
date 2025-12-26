@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Monthly Input</title>
+    <script src="https://unpkg.com/htmx.org@2.0.1"></script>
+    <style>
+        body {
+            font-family: sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        h1,
+        h2 {
+            color: #333;
+        }
+
+        section {
+            margin-bottom: 30px;
+            border: 1px solid #ddd;
+            padding: 15px;
+            border-radius: 5px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+
+        th,
+        td {
+            text-align: left;
+            padding: 8px;
+            border-bottom: 1px solid #eee;
+        }
+
+        input[type="number"],
+        input[type="text"],
+        input[type="month"] {
+            width: 100%;
+            padding: 5px;
+            box-sizing: border-box;
+        }
+
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+
+        button:hover {
+            background: #0056b3;
+        }
+
+        .row-del {
+            color: red;
+            cursor: pointer;
+            text-align: center;
+        }
+
+        .actions {
+            text-align: right;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Monthly Financial Input</h1>
+
+    <form method="POST" action="/input">
+        <section>
+            <h2>Target Month</h2>
+            <input type="month" name="target_month" value="{{ target_month }}" required>
+        </section>
+
+        <section>
+            <h2>Income</h2>
+            <table id="income-table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Account ID</th>
+                        <th>Amount</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in income_items %}
+                    <tr>
+                        <td>{{ item.name }}</td>
+                        <td><input type="text" name="income_account[]" value="{{ item.account_id }}" readonly
+                                style="background:#f9f9f9"></td>
+                        <td><input type="number" name="income_amount[]" value="{{ item.amount }}"></td>
+                        <td class="row-del" onclick="this.parentElement.remove()">x</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <button type="button" onclick="addRow('income-table', 'income')">Add Income Row</button>
+        </section>
+
+
+        <section>
+            <h2>Credit Cards</h2>
+            <table id="card-table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Method ID</th>
+                        <th>Amount</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in card_items %}
+                    <tr>
+                        <td>{{ item.name }}</td>
+                        <td><input type="text" name="expense_method[]" value="{{ item.method_id }}" readonly
+                                style="background:#f9f9f9"></td>
+                        <td><input type="number" name="expense_amount[]" value="{{ item.amount }}"></td>
+                        <td class="row-del" onclick="this.parentElement.remove()">x</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </section>
+
+        <section>
+            <h2>Other Expenses</h2>
+            <table id="other-expense-table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Method ID</th>
+                        <th>Amount</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in other_expense_items %}
+                    <tr>
+                        <td>{{ item.name }}</td>
+                        <td><input type="text" name="expense_method[]" value="{{ item.method_id }}" readonly
+                                style="background:#f9f9f9"></td>
+                        <td><input type="number" name="expense_amount[]" value="{{ item.amount }}"></td>
+                        <td class="row-del" onclick="this.parentElement.remove()">x</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <button type="button" onclick="addRow('other-expense-table', 'expense')">Add Expense Row</button>
+        </section>
+
+
+        <section>
+            <h2>Assets (Balances)</h2>
+            <table id="asset-table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Account ID</th>
+                        <th>Class</th>
+                        <th>Balance</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in asset_items %}
+                    <tr>
+                        <td>{{ item.name }}</td>
+                        <td><input type="text" name="asset_account[]" value="{{ item.account_id }}" readonly
+                                style="background:#f9f9f9"></td>
+                        <td><input type="text" name="asset_class[]" value="{{ item.asset_class }}" readonly
+                                style="background:#f9f9f9"></td>
+                        <td><input type="number" name="asset_balance[]" value="{{ item.balance }}"></td>
+                        <td class="row-del" onclick="this.parentElement.remove()">x</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </section>
+
+
+        <div class="actions">
+            <button type="submit">Save All Data</button>
+        </div>
+    </form>
+
+    <script>
+        function addRow(tableId, type) {
+            const tbody = document.getElementById(tableId).querySelector('tbody');
+            const newRow = document.createElement('tr');
+            if (type === 'income') {
+                newRow.innerHTML = `
+                    <td><input type="text" name="income_account[]" placeholder="Account ID"></td>
+                    <td><input type="number" name="income_amount[]" value="0"></td>
+                    <td class="row-del" onclick="this.parentElement.remove()">x</td>
+                `;
+            } else if (type === 'expense') {
+                newRow.innerHTML = `
+                    <td><input type="text" name="expense_method[]" placeholder="Method ID"></td>
+                    <td><input type="number" name="expense_amount[]" value="0"></td>
+                    <td class="row-del" onclick="this.parentElement.remove()">x</td>
+                `;
+            }
+            tbody.appendChild(newRow);
+        }
+    </script>
+</body>
+
+</html>

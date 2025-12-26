@@ -1,11 +1,12 @@
 method_id,name,settlement_day,settlement_account
-smbc_1,三井住友カードNumberless,26,rakuten_sec
-smbc_2,三井住友カードAmazon,26,sony
-rakuten_1,楽天カードJCB,27,rakuten_sec
-rakuten_2,楽天カードMasterCard,27,rakuten_sec
+smbc_numberless,三井住友カードNumberless,26,rakuten_sec
+smbc_amazon,三井住友カードAmazon,26,sony
+rakuten_jcb,楽天カードJCB,27,rakuten_sec
+rakuten_mastercard,楽天カードMasterCard,27,rakuten_sec
 epos,エポスカード,27,yucho
 monex_card,マネックスカード,27,rakuten_sec
 sony_card,ソニー銀行,0,sony
+mercari,メルカリカード,27,
 wise,WISE,0,wise
 cash,現金,0,
 adjustment,調整,0,

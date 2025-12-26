@@ -15,7 +15,9 @@ class MetricsCalculator:
         bs_map = {bs.month: bs for bs in bs_statements}
         market_map = {m.month: m for m in markets}
 
-        months = sorted(list(set(cf_map.keys()) | set(bs_map.keys()) | set(market_map.keys())))
+        months = sorted(
+            list(set(cf_map.keys()) | set(bs_map.keys()) | set(market_map.keys()))
+        )
 
         # Helper to get past N months (inclusive of current)
         def get_past_n_months_sums(
@@ -24,38 +26,38 @@ class MetricsCalculator:
             curr_date = datetime.strptime(current_month_str, "%Y-%m")
             curr_y = curr_date.year
             curr_m = curr_date.month
-            
+
             total_gain = 0
             total_expense = 0
             total_income = 0
             total_savings = 0
-            
+
             for i in range(n):
                 # Calculate target year/month
                 # total_months_idx = y * 12 + (m - 1)
                 month_idx = curr_y * 12 + (curr_m - 1) - i
                 y = month_idx // 12
                 m = (month_idx % 12) + 1
-                
+
                 m_str = f"{y:04d}-{m:02d}"
-                
+
                 bs_item = bs_map.get(m_str)
                 cf_item = cf_map.get(m_str)
-                
+
                 if bs_item:
                     total_gain += bs_item.investment_gain_loss
                 if cf_item:
                     total_expense += cf_item.expenditure
                     total_income += cf_item.after_tax_income
                     total_savings += cf_item.net_savings
-            
+
             return total_gain, total_expense, total_income, total_savings
 
         metrics_list: List[FinancialMetrics] = []
 
         prev_bs: Optional[BalanceSheet] = None
         prev_market: Optional[Market] = None
-        
+
         # Rolling windows for smoothing
         raw_returns_window: List[float] = []
         raw_benchmarks_window: List[float] = []
@@ -72,12 +74,12 @@ class MetricsCalculator:
             # 1. Savings Rate (Trailing 12-Month)
             # savings_rate = sum(net_savings, 12m) / sum(after_tax_income, 12m)
             savings_rate = 0.0
-            
+
             # Use helpers to get TTM sums
-            # We reuse the helper, ignoring gain/expense for this call if not needed, 
+            # We reuse the helper, ignoring gain/expense for this call if not needed,
             # effectively we need 12m sums for everything now.
             _, _, sum_income_12m, sum_savings_12m = get_past_n_months_sums(month, 12)
-            
+
             if sum_income_12m != 0:
                 savings_rate = sum_savings_12m / sum_income_12m
 
@@ -85,7 +87,9 @@ class MetricsCalculator:
             # risk_asset_ratio = (risk_assets + pension_assets) / total_financial_assets
             risk_ratio = 0.0
             if bs.total_financial_assets != 0:
-                risk_ratio = (bs.risk_assets + bs.pension_assets) / bs.total_financial_assets
+                risk_ratio = (
+                    bs.risk_assets + bs.pension_assets
+                ) / bs.total_financial_assets
 
             # 3. Monthly Return (ROI) - RAW Calculation
             # raw_monthly_return = investment_gain / prev_month_risk_assets
@@ -99,7 +103,7 @@ class MetricsCalculator:
             # 4. Benchmark Return - RAW Calculation
             # Benchmark Return = (JPY_SP500_M / JPY_SP500_M-1) - 1
             raw_benchmark_return = 0.0
-            
+
             if market and prev_market:
                 # Calculate JPY denominated SP500 for both months
                 current_sp500_jpy = market.sp500 * market.usd_jpy
@@ -111,29 +115,31 @@ class MetricsCalculator:
             # Update Rolling Windows
             raw_returns_window.append(raw_monthly_return)
             raw_benchmarks_window.append(raw_benchmark_return)
-            
+
             # Keep only last 12
             if len(raw_returns_window) > 12:
                 raw_returns_window.pop(0)
             if len(raw_benchmarks_window) > 12:
                 raw_benchmarks_window.pop(0)
-                
+
             # Calculate Geometric Mean Return
             # Formula: (Product(1 + r))^(1/n) - 1
             geo_monthly_return = 0.0
             if raw_returns_window:
                 product_ret = 1.0
                 for r in raw_returns_window:
-                    product_ret *= (1 + r)
+                    product_ret *= 1 + r
                 geo_monthly_return = (product_ret ** (1 / len(raw_returns_window))) - 1
 
             geo_benchmark_return = 0.0
             if raw_benchmarks_window:
                 product_bench = 1.0
                 for r in raw_benchmarks_window:
-                    product_bench *= (1 + r)
-                geo_benchmark_return = (product_bench ** (1 / len(raw_benchmarks_window))) - 1
-            
+                    product_bench *= 1 + r
+                geo_benchmark_return = (
+                    product_bench ** (1 / len(raw_benchmarks_window))
+                ) - 1
+
             # Alpha based on Geo Returns
             geo_monthly_alpha = geo_monthly_return - geo_benchmark_return
 

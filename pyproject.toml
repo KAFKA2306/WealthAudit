@@ -1,8 +1,10 @@
+[build-system]
+requires = ["setuptools>=61.0", "setuptools_scm"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "bspl"
 dynamic = ["version"]
-
-
 description = "Household Financial Statement Calculator"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -22,6 +24,12 @@ dev = [
     "ruff",
     "pandas-stubs",
 ]
+
+[tool.setuptools]
+packages = ["src"]
+
+[tool.setuptools_scm]
+version_scheme = "no-guess-dev"
 
 [tool.mypy]
 python_version = "3.10"
