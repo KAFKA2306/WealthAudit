@@ -159,11 +159,11 @@ def main() -> None:
     normalized.to_csv(output_path, index=False)
     print(f"Exported normalized table to: {output_path}")
     print(f"Rows: {len(normalized)}, Columns: {len(normalized.columns)}")
-    print(f"\nColumn order (finance logic):")
-    print(f"  1. month")
-    print(f"  2. P/L: 収入_* → 支出_* → cashflow")
-    print(f"  3. B/S: 資産_* (Account) → 分類_* (Class) → balance_sheet")
-    print(f"  4. Metrics: ratios, returns")
+    print("\nColumn order (finance logic):")
+    print("  1. month")
+    print("  2. P/L: 収入_* → 支出_* → cashflow")
+    print("  3. B/S: 資産_* (Account) → 分類_* (Class) → balance_sheet")
+    print("  4. Metrics: ratios, returns")
 
 
 if __name__ == "__main__":

@@ -1,4 +1,3 @@
-"""Graph generation service for financial data visualization."""
 
 import os
 from dataclasses import dataclass
@@ -11,7 +10,6 @@ import plotly.graph_objects as go
 
 @dataclass
 class GraphService:
-    """Service for generating Plotly HTML chart fragments."""
 
     data_dir: str
 
@@ -32,7 +30,6 @@ class GraphService:
         return df[df["month"] <= current]
 
     def get_net_worth_chart(self, months: Optional[int] = None, forecast: Optional[int] = None) -> str:
-        """Generate stacked bar chart for net worth trend."""
         df = self._load_csv("forecast.csv")
         df = self._filter_data(df, months, forecast)
 
@@ -81,7 +78,6 @@ class GraphService:
         return cast(str, fig.to_html(full_html=False, include_plotlyjs="cdn"))
 
     def get_cashflow_chart(self, months: Optional[int] = None, forecast: Optional[int] = None) -> str:
-        """Generate bar chart for monthly cash flow."""
         df = self._load_csv("forecast.csv")
         df = self._filter_data(df, months, forecast)
 
@@ -167,11 +163,9 @@ class GraphService:
         return cast(str, fig.to_html(full_html=False, include_plotlyjs="cdn"))
 
     def get_allocation_chart(self, months: Optional[int] = None, forecast: Optional[int] = None) -> str:
-        """Generate 100% stacked bar chart for asset allocation trend."""
         df = self._load_csv("forecast.csv")
         df = self._filter_data(df, months, forecast)
 
-        # Calculate percentages
         total = df["liquid_assets"] + df["risk_assets"] + df["pension_assets"]
         liquid_pct = df["liquid_assets"] / total * 100
         risk_pct = df["risk_assets"] / total * 100
@@ -223,7 +217,6 @@ class GraphService:
         return cast(str, fig.to_html(full_html=False, include_plotlyjs="cdn"))
 
     def get_ratios_chart(self, months: Optional[int] = None, forecast: Optional[int] = None) -> str:
-        """Generate line chart for savings rate and risk asset ratio."""
         df = self._load_csv("forecast.csv")
         df = self._filter_data(df, months, forecast)
 
@@ -263,7 +256,6 @@ class GraphService:
         return cast(str, fig.to_html(full_html=False, include_plotlyjs="cdn"))
 
     def get_returns_chart(self, months: Optional[int] = None, forecast: Optional[int] = None) -> str:
-        """Generate line chart for investment returns."""
         df = self._load_csv("forecast.csv")
         df = self._filter_data(df, months, forecast)
 
@@ -313,7 +305,6 @@ class GraphService:
         return cast(str, fig.to_html(full_html=False, include_plotlyjs="cdn"))
 
     def get_fi_chart(self, months: Optional[int] = None, forecast: Optional[int] = None) -> str:
-        """Generate line chart for Financial Independence ratios."""
         df = self._load_csv("forecast.csv")
         df = self._filter_data(df, months, forecast)
 

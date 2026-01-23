@@ -19,7 +19,6 @@ class MetricsCalculator:
             list(set(cf_map.keys()) | set(bs_map.keys()) | set(market_map.keys()))
         )
 
-        # Helper to get past N months (inclusive of current)
         def get_past_n_months_sums(
             current_month_str: str, n: int
         ) -> Tuple[int, int, int, int]:
@@ -33,8 +32,6 @@ class MetricsCalculator:
             total_savings = 0
 
             for i in range(n):
-                # Calculate target year/month
-                # total_months_idx = y * 12 + (m - 1)
                 month_idx = curr_y * 12 + (curr_m - 1) - i
                 y = month_idx // 12
                 m = (month_idx % 12) + 1
@@ -58,7 +55,9 @@ class MetricsCalculator:
         prev_bs: Optional[BalanceSheet] = None
         prev_market: Optional[Market] = None
 
-        # Rolling windows for smoothing
+        prev_bs: Optional[BalanceSheet] = None
+        prev_market: Optional[Market] = None
+
         raw_returns_window: List[float] = []
         raw_benchmarks_window: List[float] = []
 
@@ -68,31 +67,28 @@ class MetricsCalculator:
             market = market_map.get(month)
 
             if not cf or not bs:
-                # Need both to calc structure metrics
                 continue
 
-            # 1. Savings Rate (Trailing 12-Month)
-            # savings_rate = sum(net_savings, 12m) / sum(after_tax_income, 12m)
             savings_rate = 0.0
 
-            # Use helpers to get TTM sums
-            # We reuse the helper, ignoring gain/expense for this call if not needed,
-            # effectively we need 12m sums for everything now.
             _, _, sum_income_12m, sum_savings_12m = get_past_n_months_sums(month, 12)
 
             if sum_income_12m != 0:
                 savings_rate = sum_savings_12m / sum_income_12m
 
-            # 2. Risk Asset Ratio
-            # risk_asset_ratio = (risk_assets + pension_assets) / total_financial_assets
+            if sum_income_12m != 0:
+                savings_rate = sum_savings_12m / sum_income_12m
+
             risk_ratio = 0.0
             if bs.total_financial_assets != 0:
                 risk_ratio = (
                     bs.risk_assets + bs.pension_assets
                 ) / bs.total_financial_assets
 
-            # 3. Monthly Return (ROI) - RAW Calculation
-            # raw_monthly_return = investment_gain / prev_month_risk_assets
+                risk_ratio = (
+                    bs.risk_assets + bs.pension_assets
+                ) / bs.total_financial_assets
+
             raw_monthly_return = 0.0
             prev_risk_assets = 0
             if prev_bs:
@@ -100,8 +96,9 @@ class MetricsCalculator:
                 if prev_risk_assets > 0:
                     raw_monthly_return = bs.investment_gain_loss / prev_risk_assets
 
-            # 4. Benchmark Return - RAW Calculation
-            # Benchmark Return = (JPY_SP500_M / JPY_SP500_M-1) - 1
+                if prev_risk_assets > 0:
+                    raw_monthly_return = bs.investment_gain_loss / prev_risk_assets
+
             raw_benchmark_return = 0.0
 
             if market and prev_market:
@@ -112,18 +109,22 @@ class MetricsCalculator:
                 if prev_sp500_jpy > 0:
                     raw_benchmark_return = (current_sp500_jpy / prev_sp500_jpy) - 1
 
-            # Update Rolling Windows
+                if prev_sp500_jpy > 0:
+                    raw_benchmark_return = (current_sp500_jpy / prev_sp500_jpy) - 1
+
             raw_returns_window.append(raw_monthly_return)
             raw_benchmarks_window.append(raw_benchmark_return)
 
-            # Keep only last 12
+            raw_benchmarks_window.append(raw_benchmark_return)
+
             if len(raw_returns_window) > 12:
                 raw_returns_window.pop(0)
             if len(raw_benchmarks_window) > 12:
                 raw_benchmarks_window.pop(0)
 
-            # Calculate Geometric Mean Return
-            # Formula: (Product(1 + r))^(1/n) - 1
+            if len(raw_benchmarks_window) > 12:
+                raw_benchmarks_window.pop(0)
+
             geo_monthly_return = 0.0
             if raw_returns_window:
                 product_ret = 1.0
@@ -140,26 +141,19 @@ class MetricsCalculator:
                     product_bench ** (1 / len(raw_benchmarks_window))
                 ) - 1
 
-            # Alpha based on Geo Returns
             geo_monthly_alpha = geo_monthly_return - geo_benchmark_return
 
-            # 5. FI Ratios
-            # Trailing 12-Month FI Ratio
             gain_12m, xp_12m, _, _ = get_past_n_months_sums(month, 12)
             fi_ratio_12m = 0.0
             if xp_12m != 0:
                 fi_ratio_12m = gain_12m / xp_12m
 
-            # Trailing 48-Month FI Ratio
             gain_48m, xp_48m, _, _ = get_past_n_months_sums(month, 48)
             fi_ratio_48m = 0.0
             if xp_48m != 0:
                 fi_ratio_48m = gain_48m / xp_48m
 
-            # Forward 12-Month FI Ratio (Projected)
-            # fi_ratio_next_12m = (risk_assets * expected_annual_return) / projected_annual_expenses
-            # projected_annual_expenses = trailing 12-month expenses (xp_12m)
-            expected_annual_return = 0.05  # Assumption: 5% annual return
+            expected_annual_return = 0.05
             fi_ratio_next_12m = 0.0
             if xp_12m != 0:
                 fi_ratio_next_12m = (bs.risk_assets * expected_annual_return) / xp_12m
@@ -178,8 +172,6 @@ class MetricsCalculator:
                 )
             )
 
-            # Update history for next iteration
-            # We ONLY update if we had valid BS/Market for this month
             if bs:
                 prev_bs = bs
             if market:

@@ -19,9 +19,7 @@ def create_app() -> Flask:
     root_dir = os.getcwd()
     graph_service = GraphService(data_dir=root_dir)
 
-    # Configuration constants
-    MA_MONTHS = 6  # Number of months for moving average / extrapolation
-    CREDIT_CARD_MIN_SETTLEMENT_DAY = 1  # settlement_day >= this = credit card
+    CREDIT_CARD_MIN_SETTLEMENT_DAY = 1
 
     def get_data_path(filename: str) -> str:
         return os.path.join(root_dir, "data", "input", filename)
@@ -115,30 +113,21 @@ def create_app() -> Flask:
                     df = df[df["month"] != target_month]
                 pd.concat([df, new_df]).to_csv(get_data_path("assets.csv"), index=False)
 
-            # 3. Trigger Recalculation
-            try:
-                import sys
-                import subprocess
+            # Trigger Recalculation
+            import subprocess
 
-                print("Triggering recalculation...")
-                
-                # 1. Run CLI (Cashflow/Metrics)
-                print("Running Task: run...")
-                subprocess.run(["task", "run"], check=True)
+            print("Triggering recalculation...")
+            
+            print("Running Task: run...")
+            subprocess.run(["task", "run"], check=True)
 
-                # 2. Run Export
-                print("Running Task: export...")
-                subprocess.run(["task", "export"], check=True)
+            print("Running Task: export...")
+            subprocess.run(["task", "export"], check=True)
 
-                # 3. Running Forecast
-                print("Running Task: forecast...")
-                subprocess.run(["task", "forecast"], check=True)
-                
-                print("Recalculation complete.")
-            except subprocess.CalledProcessError as e:
-                print(f"Error during recalculation: {e}")
-            except Exception as e:
-                print(f"Unexpected error during recalculation: {e}")
+            print("Running Task: forecast...")
+            subprocess.run(["task", "forecast"], check=True)
+            
+            print("Recalculation complete.")
 
             return redirect(url_for("dashboard"))
 

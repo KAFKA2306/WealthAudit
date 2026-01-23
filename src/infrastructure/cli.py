@@ -17,13 +17,11 @@ def main() -> None:
     root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
     injector = Injector([AppModule(root_dir)])
 
-    # Repositories
     transaction_repo = injector.get(ITransactionRepository)  # type: ignore
     asset_repo = injector.get(IAssetRepository)  # type: ignore
     market_repo = injector.get(IMarketRepository)  # type: ignore
     master_repo = injector.get(IMasterRepository)  # type: ignore
 
-    # Calculators
     cf_calculator = injector.get(CashFlowCalculator)
     bs_calculator = injector.get(BalanceSheetCalculator)
     metrics_calculator = injector.get(MetricsCalculator)
@@ -63,7 +61,6 @@ def main() -> None:
         os.path.join(output_dir, "cashflow.csv"), index=False, float_format="%.4g"
     )
 
-    # 2. Balance Sheet
     bs_data = []
     for bs in bs_statements:
         bs_data.append(
@@ -80,7 +77,6 @@ def main() -> None:
         os.path.join(output_dir, "balance_sheet.csv"), index=False, float_format="%.4g"
     )
 
-    # 3. Metrics
     metrics_data = []
     for m in metrics:
         metrics_data.append(

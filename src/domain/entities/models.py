@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 from typing import NewType, Optional
 
-# Value Objects / Type Aliases
 from src.constants import (
     AccountId,
     AssetClassId,
@@ -17,14 +16,14 @@ Month = NewType("Month", str)
 class Income:
     month: Month
     account_id: AccountId
-    amount: int  # JPY
+    amount: int
 
 
 @dataclass(frozen=True)
 class Expense:
     month: Month
     method_id: PaymentMethodId
-    amount: int  # JPY (Negative for adjustments)
+    amount: int
 
 
 @dataclass(frozen=True)
@@ -32,7 +31,7 @@ class Asset:
     month: Month
     account_id: AccountId
     asset_class: AssetClassId
-    balance: float  # Original Currency
+    balance: float
 
 
 @dataclass(frozen=True)
@@ -47,13 +46,13 @@ class Market:
 class Account:
     id: AccountId
     name: str
-    type: AccountType  # 'bank', 'securities', etc.
-    currency: Currency  # 'JPY', 'EUR', 'multi'
-    risk: int  # 0 or 1
+    type: AccountType
+    currency: Currency
+    risk: int
 
 
 @dataclass(frozen=True)
 class PaymentMethod:
     id: PaymentMethodId
     name: str
-    settlement_account: Optional[AccountId]  # Link to Account
+    settlement_account: Optional[AccountId]

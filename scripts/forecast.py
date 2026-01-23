@@ -343,7 +343,7 @@ def calculate_metrics_vectorized(df: pd.DataFrame, geo_return_rate: float) -> pd
     # For history: we assume normalized.csv has 'benchmark_return' pre-calculated
     # For forecast: we assume it equals the assumed geo_return_rate constant
     # We need to fill forecast rows first
-    is_forecast = df["month"] > df["month"].iloc[len(df) - 360 - 1] # Approximate split
+    # is_forecast = df["month"] > df["month"].iloc[len(df) - 360 - 1] # Approximate split
     # Better: identify which rows originally had NaN benchmark_return
     if "benchmark_return" not in df.columns:
         df["benchmark_return"] = 0.0
@@ -358,7 +358,7 @@ def calculate_metrics_vectorized(df: pd.DataFrame, geo_return_rate: float) -> pd
     # Let's assume for forecast, the raw benchmark return is 'geo_return_rate'.
     # So the TTM geom mean will converge to 'geo_return_rate'.
     # We will just fill the column for forecast with the constant.
-    forecast_mask = df["benchmark_return"].isna() | (df["benchmark_return"] == 0) # Simplification
+    # forecast_mask = df["benchmark_return"].isna() | (df["benchmark_return"] == 0) # Simplification
     # Correct way: Identify forecast rows by index or month
     # We know forecast is appended at end.
     # Actually, normalized.csv has 'benchmark_return' which is ALREADY the TTM value from metrics.py?
