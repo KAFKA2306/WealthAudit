@@ -67,10 +67,13 @@ A web form is available to simplify monthly data entry.
 ```bash
 uv run python -m src.infrastructure.web
 # Navigate to http://localhost:5000/input
+# Or use the specific view: http://localhost:5000/input?ma_months=12
 ```
 
 ### Features
-- **Auto-fill**: Fixed items (Pension, DC) are pre-populated.
+- **Auto-fill**: 
+    - Fixed items (Pension, DC) are pre-populated.
+    - Variable items use Moving Average (Selectable: **6 Months**, **1 Year**, **5 Years**).
 - **Defaults**: Variable items show last month's values.
 - **Add/Remove**: Dynamically manage rows.
 - **Save**: Appends to `data/input/*.csv`.
@@ -78,5 +81,5 @@ uv run python -m src.infrastructure.web
 ### Workflow
 1. Open `/input` at month-end.
 2. Update values and click **Save All Data**.
-3. Run CLI to recalculate: `uv run python -m src.infrastructure.cli`
+3. The system automatically recalculates (runs `task run`, `task export`, `task forecast`).
 4. View dashboard at `/`.

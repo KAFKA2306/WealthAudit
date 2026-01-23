@@ -11,7 +11,7 @@ The web server provides HTMX endpoints for the financial dashboard.
 | Method | Route | Query Params | Description |
 |--------|-------|--------------|-------------|
 | GET | `/` | - | Dashboard HTML page |
-| GET/POST | `/input` | - | Data entry form (income, expense, assets, market) |
+| GET/POST | `/input` | `ma_months` | Data entry form (income, expense, assets, market) |
 | GET | `/graphs/net-worth` | `months` | Net worth stacked bar chart |
 | GET | `/graphs/cashflow` | `months` | Income/expense bar chart (6-month moving average) |
 | GET | `/graphs/allocation` | `months` | Asset allocation trend (100% stacked bar) |

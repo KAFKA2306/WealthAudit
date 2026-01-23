@@ -123,16 +123,16 @@ def create_app() -> Flask:
                 print("Triggering recalculation...")
                 
                 # 1. Run CLI (Cashflow/Metrics)
-                print("Running CLI (Cashflow/Metrics)...")
-                subprocess.run([sys.executable, "-m", "src.infrastructure.cli"], check=True)
+                print("Running Task: run...")
+                subprocess.run(["task", "run"], check=True)
 
                 # 2. Run Export
-                print("Running Export...")
-                subprocess.run([sys.executable, "scripts/export_normalized.py"], check=True)
+                print("Running Task: export...")
+                subprocess.run(["task", "export"], check=True)
 
                 # 3. Running Forecast
-                print("Running Forecast...")
-                subprocess.run([sys.executable, "scripts/forecast.py"], check=True)
+                print("Running Task: forecast...")
+                subprocess.run(["task", "forecast"], check=True)
                 
                 print("Recalculation complete.")
             except subprocess.CalledProcessError as e:
