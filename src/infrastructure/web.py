@@ -84,9 +84,11 @@ def create_app() -> Flask:
             if new_income:
                 df = load_csv("income.csv")
                 new_df = pd.DataFrame(new_income)
-                # Ensure correct columns if file empty
                 if df.empty:
                     df = pd.DataFrame(columns=["month", "account_id", "amount"])
+                else:
+                    # Overwrite: Remove existing entries for target_month
+                    df = df[df["month"] != target_month]
                 pd.concat([df, new_df]).to_csv(get_data_path("income.csv"), index=False)
 
             if new_expenses:
@@ -94,6 +96,9 @@ def create_app() -> Flask:
                 new_df = pd.DataFrame(new_expenses)
                 if df.empty:
                     df = pd.DataFrame(columns=["month", "method_id", "amount"])
+                else:
+                    # Overwrite
+                    df = df[df["month"] != target_month]
                 pd.concat([df, new_df]).to_csv(
                     get_data_path("expense.csv"), index=False
                 )
@@ -105,12 +110,43 @@ def create_app() -> Flask:
                     df = pd.DataFrame(
                         columns=["month", "account_id", "asset_class", "balance"]
                     )
+                else:
+                    # Overwrite
+                    df = df[df["month"] != target_month]
                 pd.concat([df, new_df]).to_csv(get_data_path("assets.csv"), index=False)
+
+            # 3. Trigger Recalculation
+            try:
+                import sys
+                import subprocess
+
+                print("Triggering recalculation...")
+                
+                # 1. Run CLI (Cashflow/Metrics)
+                print("Running CLI (Cashflow/Metrics)...")
+                subprocess.run([sys.executable, "-m", "src.infrastructure.cli"], check=True)
+
+                # 2. Run Export
+                print("Running Export...")
+                subprocess.run([sys.executable, "scripts/export_normalized.py"], check=True)
+
+                # 3. Running Forecast
+                print("Running Forecast...")
+                subprocess.run([sys.executable, "scripts/forecast.py"], check=True)
+                
+                print("Recalculation complete.")
+            except subprocess.CalledProcessError as e:
+                print(f"Error during recalculation: {e}")
+            except Exception as e:
+                print(f"Unexpected error during recalculation: {e}")
 
             return redirect(url_for("dashboard"))
 
         else:
-            # --- GET: Pre-fill using 6-month moving average ---
+            # --- GET: Pre-fill using Moving Average ---
+            # Default to 6 months
+            ma_months = request.args.get("ma_months", default=6, type=int)
+            
             income_df = load_csv("income.csv")
             expense_df = load_csv("expense.csv")
             asset_df = load_csv("assets.csv")
@@ -125,14 +161,14 @@ def create_app() -> Flask:
                 last_date = datetime.datetime.strptime(last_month_str, "%Y-%m")
                 target_month = (last_date + relativedelta(months=1)).strftime("%Y-%m")
 
-            # Get last 6 months for averaging
+            # Get last N months for averaging
             months_list = (
-                sorted(income_df["month"].unique())[-MA_MONTHS:]
+                sorted(income_df["month"].unique())[-ma_months:]
                 if not income_df.empty
                 else []
             )
 
-            # Pre-fill Income (6MA) - load names from master
+            # Pre-fill Income (MA) - load names from master
             income_items = []
             accounts_path = os.path.join(root_dir, "master", "accounts.csv")
             accounts_df = (
@@ -159,7 +195,7 @@ def create_app() -> Flask:
                         {"account_id": acc, "name": name, "amount": avg}
                     )
 
-            # Pre-fill Expenses (6MA) - load from master
+            # Pre-fill Expenses (MA) - load from master
             card_items = []
             other_expense_items = []
 
@@ -172,7 +208,7 @@ def create_app() -> Flask:
             )
 
             if not expense_df.empty and not methods_df.empty:
-                exp_months = sorted(expense_df["month"].unique())[-MA_MONTHS:]
+                exp_months = sorted(expense_df["month"].unique())[-ma_months:]
                 recent_exp = expense_df[expense_df["month"].isin(exp_months)]
 
                 for _, method in methods_df.iterrows():
@@ -180,7 +216,7 @@ def create_app() -> Flask:
                     name = method["name"]
                     settlement_day = method["settlement_day"]
 
-                    # Calculate 6MA
+                    # Calculate MA
                     met_data = recent_exp[recent_exp["method_id"] == met]
                     avg = int(met_data["amount"].mean()) if not met_data.empty else 0
 
@@ -192,10 +228,10 @@ def create_app() -> Flask:
                     else:
                         other_expense_items.append(item)
 
-            # Pre-fill Assets (linear extrapolation from 6 months)
+            # Pre-fill Assets (linear extrapolation from N months)
             asset_items = []
             if not asset_df.empty:
-                asset_months = sorted(asset_df["month"].unique())[-MA_MONTHS:]
+                asset_months = sorted(asset_df["month"].unique())[-ma_months:]
                 recent_assets = asset_df[asset_df["month"].isin(asset_months)]
                 last_month_str = asset_df["month"].iloc[-1]
 
@@ -247,6 +283,7 @@ def create_app() -> Flask:
                 card_items=card_items,
                 other_expense_items=other_expense_items,
                 asset_items=asset_items,
+                ma_months=ma_months,
             )
 
     @app.route("/graphs/net-worth")
@@ -290,6 +327,17 @@ def create_app() -> Flask:
         months = request.args.get("months", type=int)
         forecast = request.args.get("forecast", type=int)
         return graph_service.get_fi_chart(months, forecast)
+
+    @app.after_request
+    def add_header(response):
+        """
+        Add headers to both force latest IE rendering engine or Chrome Frame,
+        and also to cache the rendered page for 10 minutes.
+        """
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, post-check=0, pre-check=0, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "-1"
+        return response
 
     return app
 

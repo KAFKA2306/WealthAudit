@@ -75,6 +75,24 @@
 <body>
     <h1>Monthly Financial Input</h1>
 
+    <div style="margin-bottom: 20px; padding: 10px; background-color: #f8f9fa; border-radius: 5px;">
+        <strong>Auto-Fill Method (Moving Average):</strong>
+        <span style="margin-left: 10px;">
+            <a href="/input?ma_months=6" 
+               style="margin-right: 15px; text-decoration: none; {{ 'font-weight: bold; color: #0056b3; border-bottom: 2px solid #0056b3;' if ma_months == 6 else 'color: #6c757d;' }}">
+               6 Months (Default)
+            </a>
+            <a href="/input?ma_months=12" 
+               style="margin-right: 15px; text-decoration: none; {{ 'font-weight: bold; color: #0056b3; border-bottom: 2px solid #0056b3;' if ma_months == 12 else 'color: #6c757d;' }}">
+               1 Year
+            </a>
+            <a href="/input?ma_months=60" 
+               style="text-decoration: none; {{ 'font-weight: bold; color: #0056b3; border-bottom: 2px solid #0056b3;' if ma_months == 60 else 'color: #6c757d;' }}">
+               5 Years
+            </a>
+        </span>
+    </div>
+
     <form method="POST" action="/input">
         <section>
             <h2>Target Month</h2>

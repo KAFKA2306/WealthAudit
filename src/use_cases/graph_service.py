@@ -4,6 +4,7 @@ import os
 from dataclasses import dataclass
 from typing import Optional, cast
 
+from datetime import datetime
 import pandas as pd
 import plotly.graph_objects as go
 
@@ -21,7 +22,7 @@ class GraphService:
     def _filter_data(
         self, df: pd.DataFrame, months: Optional[int], forecast: Optional[int]
     ) -> pd.DataFrame:
-        current = "2025-12"
+        current = datetime.now().strftime("%Y-%m")
         if forecast:
             start = (pd.to_datetime(current) - pd.DateOffset(months=12)).strftime("%Y-%m")
             end = (pd.to_datetime(current) + pd.DateOffset(months=forecast)).strftime("%Y-%m")

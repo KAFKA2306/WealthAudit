@@ -40,6 +40,9 @@ class PaymentMethodId(str, Enum):
     ADJUSTMENT = "adjustment"
     RAKUTEN_JCB = "rakuten_jcb"
     SMBC_NUMBERLESS = "smbc_numberless"
+    SMBC_AMAZON = "smbc_amazon"
+    RAKUTEN_MASTERCARD = "rakuten_mastercard"
+    MERCARI = "mercari"
 
 
 class AccountType(str, Enum):
