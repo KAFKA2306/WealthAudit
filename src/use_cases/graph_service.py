@@ -35,12 +35,16 @@ class GraphService:
 
         fig = go.Figure()
 
+        # 合計値の計算
+        total = df["liquid_assets"] + df["risk_assets"] + df["pension_assets"]
+
         fig.add_trace(
             go.Bar(
                 x=df["month"],
                 y=df["liquid_assets"],
                 name="Liquid Assets",
                 marker_color="rgba(59, 130, 246, 0.8)",
+                hovertemplate="Liquid Assets: %{y:,.0f}万円<extra></extra>",
             )
         )
 
@@ -50,6 +54,7 @@ class GraphService:
                 y=df["risk_assets"],
                 name="Risk Assets",
                 marker_color="rgba(16, 185, 129, 0.8)",
+                hovertemplate="Risk Assets: %{y:,.0f}万円<extra></extra>",
             )
         )
 
@@ -59,6 +64,20 @@ class GraphService:
                 y=df["pension_assets"],
                 name="Pension Assets",
                 marker_color="rgba(139, 92, 246, 0.8)",
+                hovertemplate="Pension Assets: %{y:,.0f}万円<extra></extra>",
+            )
+        )
+
+        # 合計を表示するための隠しトレース
+        fig.add_trace(
+            go.Scatter(
+                x=df["month"],
+                y=total,
+                name="TOTAL",
+                mode="lines",
+                line=dict(width=0),
+                hovertemplate="<b>TOTAL: %{y:,.0f}万円</b><extra></extra>",
+                showlegend=False
             )
         )
 
@@ -91,6 +110,7 @@ class GraphService:
                 y=df["after_tax_income"],
                 name="Income",
                 marker_color="rgba(16, 185, 129, 0.8)",
+                hovertemplate="Income: %{y:,.1f}万円<extra></extra>",
             )
         )
 
@@ -101,6 +121,7 @@ class GraphService:
                 name="Income (12MA)",
                 mode="lines",
                 line=dict(color="rgba(16, 185, 129, 1)", width=3, dash="dash"),
+                hovertemplate="Income (12MA): %{y:,.1f}万円<extra></extra>",
             )
         )
 
@@ -110,6 +131,7 @@ class GraphService:
                 y=-df["expenditure"],
                 name="Expenses",
                 marker_color="rgba(239, 68, 68, 0.8)",
+                hovertemplate="Expenses: %{y:,.1f}万円<extra></extra>",
             )
         )
 
@@ -119,6 +141,7 @@ class GraphService:
                 y=df["investment_gain_loss"],
                 name="Investment G/L",
                 marker_color="rgba(139, 92, 246, 0.8)",
+                hovertemplate="Inv G/L: %{y:,.1f}万円<extra></extra>",
             )
         )
 
@@ -133,6 +156,7 @@ class GraphService:
                 mode="lines+markers",
                 line=dict(color="rgba(59, 130, 246, 1)", width=2),
                 marker=dict(size=6),
+                hovertemplate="<b>Total Flow: %{y:,.1f}万円</b><extra></extra>",
             )
         )
 
@@ -143,6 +167,7 @@ class GraphService:
                 name="Total Flow (12MA)",
                 mode="lines",
                 line=dict(color="rgba(245, 158, 11, 1)", width=3, dash="dash"),
+                hovertemplate="Flow (12MA): %{y:,.1f}万円<extra></extra>",
             )
         )
 
@@ -179,6 +204,7 @@ class GraphService:
                 y=liquid_pct,
                 name="Liquid Assets",
                 marker_color="rgba(59, 130, 246, 0.8)",
+                hovertemplate="Liquid: %{y:.1f}%<extra></extra>",
             )
         )
 
@@ -188,6 +214,7 @@ class GraphService:
                 y=risk_pct,
                 name="Risk Assets",
                 marker_color="rgba(16, 185, 129, 0.8)",
+                hovertemplate="Risk: %{y:.1f}%<extra></extra>",
             )
         )
 
@@ -197,6 +224,7 @@ class GraphService:
                 y=pension_pct,
                 name="Pension Assets",
                 marker_color="rgba(139, 92, 246, 0.8)",
+                hovertemplate="Pension: %{y:.1f}%<extra></extra>",
             )
         )
 
@@ -229,6 +257,7 @@ class GraphService:
                 name="Savings Rate (%)",
                 mode="lines+markers",
                 line=dict(color="rgba(59, 130, 246, 1)", width=2),
+                hovertemplate="Savings Rate: %{y:.1f}%<extra></extra>",
             )
         )
 
@@ -239,6 +268,7 @@ class GraphService:
                 name="Risk Asset Ratio (%)",
                 mode="lines+markers",
                 line=dict(color="rgba(16, 185, 129, 1)", width=2),
+                hovertemplate="Risk Asset Ratio: %{y:.1f}%<extra></extra>",
             )
         )
 
@@ -268,6 +298,7 @@ class GraphService:
                 name="Monthly Return (%)",
                 mode="lines+markers",
                 line=dict(color="rgba(59, 130, 246, 1)", width=2),
+                hovertemplate="My Return: %{y:.2f}%<extra></extra>",
             )
         )
 
@@ -278,6 +309,7 @@ class GraphService:
                 name="Benchmark Return (%)",
                 mode="lines+markers",
                 line=dict(color="rgba(148, 163, 184, 1)", width=2, dash="dot"),
+                hovertemplate="Benchmark: %{y:.2f}%<extra></extra>",
             )
         )
 
@@ -288,6 +320,7 @@ class GraphService:
                 name="Alpha (%)",
                 mode="lines+markers",
                 line=dict(color="rgba(139, 92, 246, 1)", width=2),
+                hovertemplate="Alpha: %{y:.2f}%<extra></extra>",
             )
         )
 
@@ -317,6 +350,7 @@ class GraphService:
                 name="FI Ratio (12m)",
                 mode="lines+markers",
                 line=dict(color="rgba(59, 130, 246, 1)", width=2),
+                hovertemplate="FI Ratio (12m): %{y:.2f}x<extra></extra>",
             )
         )
 
@@ -327,6 +361,7 @@ class GraphService:
                 name="FI Ratio (48m)",
                 mode="lines+markers",
                 line=dict(color="rgba(16, 185, 129, 1)", width=2),
+                hovertemplate="FI Ratio (48m): %{y:.2f}x<extra></extra>",
             )
         )
 
@@ -337,6 +372,7 @@ class GraphService:
                 name="FI Ratio (Proj)",
                 mode="lines+markers",
                 line=dict(color="rgba(245, 158, 11, 1)", width=2, dash="dot"),
+                hovertemplate="FI Ratio (Proj): %{y:.2f}x<extra></extra>",
             )
         )
 
