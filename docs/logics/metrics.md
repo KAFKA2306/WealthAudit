@@ -50,5 +50,5 @@ The projected FI ratio for the next 12 months, based on expected benchmark retur
 `fi_ratio_next_12m = (risk_assets * expected_annual_return) / projected_annual_expenses`
 
 where:
-- `expected_annual_return` is currently set to **5.0%** (0.05).
+- `expected_annual_return` is defined as `EXPECTED_ANNUAL_RETURN` in `src/constants.py` (e.g., 0.05 for 5.0%).
 - `projected_annual_expenses` is the trailing 12-month expenses or a user-defined budget

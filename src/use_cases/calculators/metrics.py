@@ -1,5 +1,6 @@
 from datetime import datetime
 from typing import List, Optional, Tuple
+from src.constants import EXPECTED_ANNUAL_RETURN
 from src.domain.entities.models import Market, Month
 from src.use_cases.dtos.output import BalanceSheet, CashFlowStatement, FinancialMetrics
 
@@ -133,7 +134,7 @@ class MetricsCalculator:
             if xp_48m != 0:
                 fi_ratio_48m = gain_48m / xp_48m
 
-            expected_annual_return = 0.05
+            expected_annual_return = EXPECTED_ANNUAL_RETURN
             fi_ratio_next_12m = 0.0
             if xp_12m != 0:
                 fi_ratio_next_12m = (bs.risk_assets * expected_annual_return) / xp_12m

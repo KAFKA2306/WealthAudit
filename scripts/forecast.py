@@ -10,6 +10,7 @@ import pandas as pd
 from pathlib import Path
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
+from src.constants import EXPECTED_ANNUAL_RETURN, FIXED_EXPENSE_CV_THRESHOLD
 
 
 def calculate_cv(series: pd.Series) -> float:
@@ -226,7 +227,7 @@ def forecast_expense(
     trend_ratio = recent_avg / same_period_last_year_avg if same_period_last_year_avg != 0 else 1
     
     forecasts = {}
-    if cv < 0.3:
+    if cv < FIXED_EXPENSE_CV_THRESHOLD:
         # Fixed expense: 12-month average
         avg = values.tail(12).mean()
         for month_str in future_months:
@@ -254,7 +255,7 @@ def forecast_expense(
             "unit": "ratio",
             "description": "Coefficient of Variation (std/mean)"
         })
-        is_fixed = cv < 0.3
+        is_fixed = cv < FIXED_EXPENSE_CV_THRESHOLD
         stats.append({
             "category": "Expense",
             "item": col,
@@ -389,10 +390,10 @@ def calculate_metrics_vectorized(df: pd.DataFrame, geo_return_rate: float) -> pd
     mask = expense_48 != 0
     df.loc[mask, "fi_ratio_48m"] = gain_48[mask] / expense_48[mask]
     
-    # fi_ratio_next_12m: (Risk * 0.05) / TTM Expense
+    # fi_ratio_next_12m: (Risk * EXPECTED_ANNUAL_RETURN) / TTM Expense
     df["fi_ratio_next_12m"] = 0.0
     mask = ttm_expense != 0
-    df.loc[mask, "fi_ratio_next_12m"] = (df.loc[mask, "risk_assets"] * 0.05) / ttm_expense[mask]
+    df.loc[mask, "fi_ratio_next_12m"] = (df.loc[mask, "risk_assets"] * EXPECTED_ANNUAL_RETURN) / ttm_expense[mask]
     
     return df
 
@@ -580,11 +581,11 @@ def main() -> None:
             if pd.notna(val) and val != 0:
                 geo_return = val
             else:
-                geo_return = 0.05 / 12
+                geo_return = EXPECTED_ANNUAL_RETURN / 12
         else:
-             geo_return = 0.05 / 12
+             geo_return = EXPECTED_ANNUAL_RETURN / 12
     else:
-        geo_return = 0.05 / 12  # Default 5% annual if no history
+        geo_return = EXPECTED_ANNUAL_RETURN / 12  # Default annual if no history
     
     stats.append({
         "category": "Asset",

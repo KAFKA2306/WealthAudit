@@ -56,3 +56,7 @@ class Currency(str, Enum):
     EUR = 'EUR'
     MULTI = 'multi'
 
+
+EXPECTED_ANNUAL_RETURN = 0.05
+FIXED_EXPENSE_CV_THRESHOLD = 0.3
+
