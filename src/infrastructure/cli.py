@@ -42,17 +42,15 @@ def main() -> None:
     print("Calculating Metrics...")
     metrics = metrics_calculator.calculate(cf_statements, bs_statements, markets)
 
-    # Export
     output_dir = os.path.join(root_dir, "data", "calculated")
     os.makedirs(output_dir, exist_ok=True)
 
-    # 1. Cash Flow
     cf_data = []
     for cf in cf_statements:
         cf_data.append(
             {
                 "month": cf.month,
-                "after_tax_income": cf.after_tax_income / 10000,  # Convert to Man-Yen
+                "after_tax_income": cf.after_tax_income / 10000,
                 "expenditure": cf.expenditure / 10000,
                 "net_savings": cf.net_savings / 10000,
             }

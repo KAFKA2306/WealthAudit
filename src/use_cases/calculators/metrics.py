@@ -38,8 +38,8 @@ class MetricsCalculator:
 
                 m_str = f"{y:04d}-{m:02d}"
 
-                bs_item = bs_map.get(m_str)
-                cf_item = cf_map.get(m_str)
+                bs_item = bs_map.get(Month(m_str))
+                cf_item = cf_map.get(Month(m_str))
 
                 if bs_item:
                     total_gain += bs_item.investment_gain_loss
@@ -52,8 +52,6 @@ class MetricsCalculator:
 
         metrics_list: List[FinancialMetrics] = []
 
-        prev_bs: Optional[BalanceSheet] = None
-        prev_market: Optional[Market] = None
 
         prev_bs: Optional[BalanceSheet] = None
         prev_market: Optional[Market] = None
@@ -62,9 +60,9 @@ class MetricsCalculator:
         raw_benchmarks_window: List[float] = []
 
         for month in months:
-            cf = cf_map.get(month)
-            bs = bs_map.get(month)
-            market = market_map.get(month)
+            cf = cf_map.get(Month(month))
+            bs = bs_map.get(Month(month))
+            market = market_map.get(Month(month))
 
             if not cf or not bs:
                 continue
@@ -76,15 +74,8 @@ class MetricsCalculator:
             if sum_income_12m != 0:
                 savings_rate = sum_savings_12m / sum_income_12m
 
-            if sum_income_12m != 0:
-                savings_rate = sum_savings_12m / sum_income_12m
-
             risk_ratio = 0.0
             if bs.total_financial_assets != 0:
-                risk_ratio = (
-                    bs.risk_assets + bs.pension_assets
-                ) / bs.total_financial_assets
-
                 risk_ratio = (
                     bs.risk_assets + bs.pension_assets
                 ) / bs.total_financial_assets
@@ -93,9 +84,6 @@ class MetricsCalculator:
             prev_risk_assets = 0
             if prev_bs:
                 prev_risk_assets = prev_bs.risk_assets
-                if prev_risk_assets > 0:
-                    raw_monthly_return = bs.investment_gain_loss / prev_risk_assets
-
                 if prev_risk_assets > 0:
                     raw_monthly_return = bs.investment_gain_loss / prev_risk_assets
 
@@ -109,19 +97,11 @@ class MetricsCalculator:
                 if prev_sp500_jpy > 0:
                     raw_benchmark_return = (current_sp500_jpy / prev_sp500_jpy) - 1
 
-                if prev_sp500_jpy > 0:
-                    raw_benchmark_return = (current_sp500_jpy / prev_sp500_jpy) - 1
-
             raw_returns_window.append(raw_monthly_return)
-            raw_benchmarks_window.append(raw_benchmark_return)
-
             raw_benchmarks_window.append(raw_benchmark_return)
 
             if len(raw_returns_window) > 12:
                 raw_returns_window.pop(0)
-            if len(raw_benchmarks_window) > 12:
-                raw_benchmarks_window.pop(0)
-
             if len(raw_benchmarks_window) > 12:
                 raw_benchmarks_window.pop(0)
 
