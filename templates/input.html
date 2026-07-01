@@ -433,6 +433,81 @@
 </head>
 
 <body>
+    {% macro transaction_section(title, note, table_id, id_heading, items, kind, add_label=None, add_note=None) %}
+    <section>
+        <div class="section-header">
+            <h2>{{ title }}</h2>
+            <span class="section-note">{{ note }}</span>
+        </div>
+        <div class="table-wrap">
+            <table id="{{ table_id }}">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>{{ id_heading }}</th>
+                        <th>Amount</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in items %}
+                    <tr>
+                        <td>{{ item.name }}</td>
+                        {% if kind == "income" %}
+                        <td><input type="text" name="income_account[]" value="{{ item.account_id }}" readonly></td>
+                        <td><input type="number" name="income_amount[]" value="{{ item.amount }}"></td>
+                        {% else %}
+                        <td><input type="text" name="expense_method[]" value="{{ item.method_id }}" readonly></td>
+                        <td><input type="number" name="expense_amount[]" value="{{ item.amount }}"></td>
+                        {% endif %}
+                        <td class="row-del" onclick="this.parentElement.remove()">x</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% if add_label %}
+        <div class="button-row">
+            <span class="section-note">{{ add_note }}</span>
+            <button type="button" onclick="addRow('{{ table_id }}', '{{ kind }}')">{{ add_label }}</button>
+        </div>
+        {% endif %}
+    </section>
+    {% endmacro %}
+
+    {% macro assets_section(items) %}
+    <section>
+        <div class="section-header">
+            <h2>Assets</h2>
+            <span class="section-note">Balances projected from the latest known snapshot.</span>
+        </div>
+        <div class="table-wrap">
+            <table id="asset-table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Account ID</th>
+                        <th>Class</th>
+                        <th>Balance</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in items %}
+                    <tr>
+                        <td>{{ item.name }}</td>
+                        <td><input type="text" name="asset_account[]" value="{{ item.account_id }}" readonly></td>
+                        <td><input type="text" name="asset_class[]" value="{{ item.asset_class }}" readonly></td>
+                        <td><input type="number" name="asset_balance[]" value="{{ item.balance }}"></td>
+                        <td class="row-del" onclick="this.parentElement.remove()">x</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+    {% endmacro %}
+
     <main class="page">
         <nav class="topbar" aria-label="Primary">
             <a class="brand" href="/" aria-label="Back to dashboard">
@@ -486,131 +561,38 @@
                 </div>
             </section>
 
-            <section>
-                <div class="section-header">
-                    <h2>Income</h2>
-                    <span class="section-note">Expected incoming cash for the month.</span>
-                </div>
-                <div class="table-wrap">
-                    <table id="income-table">
-                        <thead>
-                            <tr>
-                                <th>Name</th>
-                                <th>Account ID</th>
-                                <th>Amount</th>
-                                <th></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for item in income_items %}
-                            <tr>
-                                <td>{{ item.name }}</td>
-                                <td><input type="text" name="income_account[]" value="{{ item.account_id }}" readonly></td>
-                                <td><input type="number" name="income_amount[]" value="{{ item.amount }}"></td>
-                                <td class="row-del" onclick="this.parentElement.remove()">x</td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-                <div class="button-row">
-                    <span class="section-note">Add a custom income source when needed.</span>
-                    <button type="button" onclick="addRow('income-table', 'income')">Add Income Row</button>
-                </div>
-            </section>
+            {{ transaction_section(
+                "Income",
+                "Expected incoming cash for the month.",
+                "income-table",
+                "Account ID",
+                income_items,
+                "income",
+                "Add Income Row",
+                "Add a custom income source when needed."
+            ) }}
 
-            <section>
-                <div class="section-header">
-                    <h2>Credit Cards</h2>
-                    <span class="section-note">Settlement-based expenses from registered cards.</span>
-                </div>
-                <div class="table-wrap">
-                    <table id="card-table">
-                        <thead>
-                            <tr>
-                                <th>Name</th>
-                                <th>Method ID</th>
-                                <th>Amount</th>
-                                <th></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for item in card_items %}
-                            <tr>
-                                <td>{{ item.name }}</td>
-                                <td><input type="text" name="expense_method[]" value="{{ item.method_id }}" readonly></td>
-                                <td><input type="number" name="expense_amount[]" value="{{ item.amount }}"></td>
-                                <td class="row-del" onclick="this.parentElement.remove()">x</td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            </section>
+            {{ transaction_section(
+                "Credit Cards",
+                "Settlement-based expenses from registered cards.",
+                "card-table",
+                "Method ID",
+                card_items,
+                "expense"
+            ) }}
 
-            <section>
-                <div class="section-header">
-                    <h2>Other Expenses</h2>
-                    <span class="section-note">Cash, transfers, and non-card spending.</span>
-                </div>
-                <div class="table-wrap">
-                    <table id="other-expense-table">
-                        <thead>
-                            <tr>
-                                <th>Name</th>
-                                <th>Method ID</th>
-                                <th>Amount</th>
-                                <th></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for item in other_expense_items %}
-                            <tr>
-                                <td>{{ item.name }}</td>
-                                <td><input type="text" name="expense_method[]" value="{{ item.method_id }}" readonly></td>
-                                <td><input type="number" name="expense_amount[]" value="{{ item.amount }}"></td>
-                                <td class="row-del" onclick="this.parentElement.remove()">x</td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-                <div class="button-row">
-                    <span class="section-note">Add one-off or manual spending lines here.</span>
-                    <button type="button" onclick="addRow('other-expense-table', 'expense')">Add Expense Row</button>
-                </div>
-            </section>
+            {{ transaction_section(
+                "Other Expenses",
+                "Cash, transfers, and non-card spending.",
+                "other-expense-table",
+                "Method ID",
+                other_expense_items,
+                "expense",
+                "Add Expense Row",
+                "Add one-off or manual spending lines here."
+            ) }}
 
-            <section>
-                <div class="section-header">
-                    <h2>Assets</h2>
-                    <span class="section-note">Balances projected from the latest known snapshot.</span>
-                </div>
-                <div class="table-wrap">
-                    <table id="asset-table">
-                        <thead>
-                            <tr>
-                                <th>Name</th>
-                                <th>Account ID</th>
-                                <th>Class</th>
-                                <th>Balance</th>
-                                <th></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for item in asset_items %}
-                            <tr>
-                                <td>{{ item.name }}</td>
-                                <td><input type="text" name="asset_account[]" value="{{ item.account_id }}" readonly></td>
-                                <td><input type="text" name="asset_class[]" value="{{ item.asset_class }}" readonly></td>
-                                <td><input type="number" name="asset_balance[]" value="{{ item.balance }}"></td>
-                                <td class="row-del" onclick="this.parentElement.remove()">x</td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            </section>
+            {{ assets_section(asset_items) }}
 
             <div class="actions">
                 <button class="save-button" type="submit">Save All Data</button>
