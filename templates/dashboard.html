@@ -5,142 +5,461 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Financial Dashboard</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='18' fill='%2317233f'/%3E%3Ccircle cx='25' cy='32' r='12' fill='none' stroke='%23f1dfb5' stroke-width='5'/%3E%3Ccircle cx='41' cy='32' r='8' fill='%23c99a3a'/%3E%3C/svg%3E">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.plot.ly/plotly-3.3.0.min.js"></script>
     <script src="https://unpkg.com/htmx.org@2.0.1"></script>
     <style>
         :root {
-            --bg-primary: #0f172a;
-            --bg-secondary: #1e293b;
-            --bg-card: #334155;
-            --text-primary: #f8fafc;
-            --text-secondary: #94a3b8;
-            --accent-blue: #3b82f6;
-            --accent-green: #10b981;
-            --accent-purple: #8b5cf6;
-            --border-color: #475569;
+            --canvas: #fbf8f1;
+            --surface: rgba(255, 255, 255, 0.86);
+            --surface-solid: #ffffff;
+            --ink: #13233f;
+            --muted: #788291;
+            --line: rgba(19, 35, 63, 0.1);
+            --gold: #c99a3a;
+            --gold-soft: #f1dfb5;
+            --navy: #17233f;
+            --sage: #738b73;
+            --rose: #b87460;
+            --shadow: 0 24px 80px rgba(23, 35, 63, 0.12);
+            --shadow-soft: 0 14px 36px rgba(23, 35, 63, 0.08);
+            --radius-xl: 34px;
+            --radius-lg: 24px;
+            --radius-md: 16px;
         }
 
         * {
+            box-sizing: border-box;
             margin: 0;
             padding: 0;
-            box-sizing: border-box;
         }
 
         body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
-            color: var(--text-primary);
             min-height: 100vh;
-            padding: 2rem;
+            color: var(--ink);
+            font-family: "Manrope", sans-serif;
+            background:
+                radial-gradient(circle at 7% 10%, rgba(241, 223, 181, 0.65), transparent 34rem),
+                radial-gradient(circle at 90% 3%, rgba(115, 139, 115, 0.22), transparent 30rem),
+                linear-gradient(135deg, #fffdf8 0%, var(--canvas) 48%, #f6efe0 100%);
+            padding: 32px;
+        }
+
+        body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            background-image:
+                linear-gradient(rgba(19, 35, 63, 0.035) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(19, 35, 63, 0.035) 1px, transparent 1px);
+            background-size: 44px 44px;
+            mask-image: linear-gradient(to bottom, black, transparent 78%);
+        }
+
+        a {
+            color: inherit;
         }
 
         .dashboard {
-            max-width: 1400px;
+            width: min(1480px, 100%);
             margin: 0 auto;
+            position: relative;
         }
 
-        header {
-            text-align: center;
-            margin-bottom: 2rem;
+        .topbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 24px;
+            margin-bottom: 32px;
         }
 
-        header h1 {
-            font-size: 2.5rem;
+        .brand {
+            display: inline-flex;
+            align-items: center;
+            gap: 14px;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--navy);
+        }
+
+        .brand-mark {
+            width: 44px;
+            height: 44px;
+            display: grid;
+            place-items: center;
+            border-radius: 50%;
+            background: linear-gradient(145deg, var(--navy), #263b67);
+            color: #fff7e6;
+            box-shadow: 0 12px 32px rgba(23, 35, 63, 0.24);
+        }
+
+        .brand-mark::before {
+            content: "";
+            width: 16px;
+            height: 16px;
+            border: 2px solid var(--gold-soft);
+            border-radius: 50%;
+            box-shadow: 10px 0 0 -3px var(--gold);
+        }
+
+        .nav-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .pill {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            min-height: 44px;
+            padding: 0 18px;
+            border: 1px solid var(--line);
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.72);
+            color: var(--muted);
+            text-decoration: none;
             font-weight: 700;
-            background: linear-gradient(90deg, var(--accent-blue), var(--accent-purple));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            margin-bottom: 0.5rem;
+            font-size: 0.88rem;
+            box-shadow: 0 8px 26px rgba(23, 35, 63, 0.06);
+            backdrop-filter: blur(16px);
+            transition: transform 180ms ease, box-shadow 180ms ease, color 180ms ease;
         }
 
-        header p {
-            color: var(--text-secondary);
-            font-size: 1rem;
+        .pill:hover {
+            transform: translateY(-2px);
+            color: var(--ink);
+            box-shadow: var(--shadow-soft);
+        }
+
+        .pill-primary {
+            border-color: rgba(201, 154, 58, 0.42);
+            background: linear-gradient(135deg, #17233f 0%, #273a66 52%, #c99a3a 180%);
+            color: #fffaf0;
+        }
+
+        .pill-primary:hover {
+            color: #fffaf0;
+        }
+
+        .hero {
+            display: grid;
+            grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
+            gap: 28px;
+            align-items: stretch;
+            margin-bottom: 28px;
+        }
+
+        .hero-panel,
+        .insight-panel,
+        .card {
+            border: 1px solid rgba(255, 255, 255, 0.72);
+            background: var(--surface);
+            box-shadow: var(--shadow);
+            backdrop-filter: blur(22px);
+        }
+
+        .hero-panel {
+            position: relative;
+            overflow: hidden;
+            border-radius: var(--radius-xl);
+            padding: clamp(32px, 6vw, 72px);
+            min-height: 430px;
+        }
+
+        .hero-panel::before {
+            content: "";
+            position: absolute;
+            width: 340px;
+            height: 340px;
+            right: -90px;
+            top: -120px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(201, 154, 58, 0.34), rgba(201, 154, 58, 0));
+        }
+
+        .hero-panel::after {
+            content: "";
+            position: absolute;
+            right: 42px;
+            bottom: 42px;
+            width: min(38vw, 360px);
+            height: min(38vw, 360px);
+            border: 1px solid rgba(201, 154, 58, 0.28);
+            border-radius: 50%;
+            box-shadow: inset 0 0 0 42px rgba(255, 255, 255, 0.42);
+        }
+
+        .eyebrow {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 26px;
+            color: var(--gold);
+            font-size: 0.78rem;
+            font-weight: 800;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+        }
+
+        .eyebrow::before {
+            content: "";
+            width: 38px;
+            height: 1px;
+            background: var(--gold);
+        }
+
+        h1 {
+            position: relative;
+            z-index: 1;
+            max-width: 760px;
+            color: var(--navy);
+            font-family: "Playfair Display", serif;
+            font-size: clamp(3.3rem, 8vw, 7.4rem);
+            line-height: 0.9;
+            letter-spacing: -0.07em;
+        }
+
+        .hero-copy {
+            position: relative;
+            z-index: 1;
+            max-width: 650px;
+            margin-top: 28px;
+            color: var(--muted);
+            font-size: clamp(1rem, 1.5vw, 1.18rem);
+            line-height: 1.8;
+        }
+
+        .hero-metrics {
+            position: relative;
+            z-index: 1;
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 14px;
+            max-width: 760px;
+            margin-top: 42px;
+        }
+
+        .metric {
+            min-height: 118px;
+            padding: 22px;
+            border: 1px solid var(--line);
+            border-radius: 22px;
+            background: rgba(255, 255, 255, 0.72);
+        }
+
+        .metric strong {
+            display: block;
+            color: var(--navy);
+            font-size: 1.45rem;
+            line-height: 1;
+        }
+
+        .metric span {
+            display: block;
+            margin-top: 10px;
+            color: var(--muted);
+            font-size: 0.78rem;
+            font-weight: 800;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+        }
+
+        .insight-panel {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            gap: 24px;
+            border-radius: var(--radius-xl);
+            padding: 34px;
+            overflow: hidden;
+        }
+
+        .orbital-card {
+            position: relative;
+            min-height: 260px;
+            border-radius: 30px;
+            background:
+                radial-gradient(circle at 50% 42%, rgba(255, 255, 255, 1), rgba(255, 248, 229, 0.92) 34%, rgba(23, 35, 63, 0.08) 35%, rgba(255, 255, 255, 0.58) 36%),
+                linear-gradient(145deg, #fffaf0, #fff);
+            border: 1px solid rgba(201, 154, 58, 0.24);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+        }
+
+        .orbital-card::before,
+        .orbital-card::after {
+            content: "";
+            position: absolute;
+            inset: 44px;
+            border: 1px solid rgba(201, 154, 58, 0.3);
+            border-radius: 50%;
+        }
+
+        .orbital-card::after {
+            inset: 82px;
+            border-color: rgba(23, 35, 63, 0.12);
+        }
+
+        .orbital-label {
+            position: absolute;
+            left: 28px;
+            bottom: 28px;
+            right: 28px;
+        }
+
+        .orbital-label strong {
+            display: block;
+            font-family: "Playfair Display", serif;
+            font-size: 2rem;
+            color: var(--navy);
+        }
+
+        .orbital-label span {
+            color: var(--muted);
+            line-height: 1.7;
+        }
+
+        .section-heading {
+            display: flex;
+            justify-content: space-between;
+            align-items: end;
+            gap: 24px;
+            margin: 46px 4px 20px;
+        }
+
+        .section-heading h2 {
+            color: var(--navy);
+            font-family: "Playfair Display", serif;
+            font-size: clamp(2rem, 4vw, 3.4rem);
+            line-height: 1;
+            letter-spacing: -0.04em;
+        }
+
+        .section-heading p {
+            max-width: 520px;
+            color: var(--muted);
+            line-height: 1.7;
         }
 
         .grid {
             display: grid;
-            grid-template-columns: 1fr;
-            gap: 1.5rem;
-            max-width: 900px;
+            grid-template-columns: minmax(0, 1fr);
+            gap: 24px;
+            width: min(1120px, 100%);
             margin: 0 auto;
         }
 
         .card {
-            background: var(--bg-card);
-            border-radius: 16px;
-            padding: 1.5rem;
-            border: 1px solid var(--border-color);
-            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
-            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            border-radius: var(--radius-lg);
+            padding: 24px;
+            transition: transform 180ms ease, box-shadow 180ms ease;
         }
 
         .card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+            transform: translateY(-4px);
+            box-shadow: 0 28px 90px rgba(23, 35, 63, 0.16);
         }
 
         .card-header {
             display: flex;
             justify-content: space-between;
-            align-items: center;
-            margin-bottom: 1rem;
-            padding-bottom: 0.75rem;
-            border-bottom: 1px solid var(--border-color);
+            align-items: flex-start;
+            gap: 18px;
+            margin-bottom: 14px;
+        }
+
+        .card-kicker {
+            display: block;
+            margin-bottom: 7px;
+            color: var(--gold);
+            font-size: 0.72rem;
+            font-weight: 800;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
         }
 
         .card-title {
-            font-size: 1.1rem;
-            font-weight: 600;
-            color: var(--text-primary);
+            color: var(--navy);
+            font-size: 1.14rem;
+            font-weight: 800;
+            letter-spacing: -0.02em;
         }
 
         .btn-group {
             display: flex;
-            gap: 0.5rem;
+            gap: 8px;
+            padding: 5px;
+            border: 1px solid var(--line);
+            border-radius: 999px;
+            background: rgba(246, 239, 224, 0.74);
         }
 
         .btn {
-            padding: 0.4rem 0.8rem;
-            border: 1px solid var(--border-color);
+            min-width: 46px;
+            border: 0;
+            border-radius: 999px;
+            padding: 9px 13px;
             background: transparent;
-            color: var(--text-secondary);
-            border-radius: 8px;
+            color: var(--muted);
             cursor: pointer;
-            font-size: 0.85rem;
-            transition: all 0.2s ease;
+            font: inherit;
+            font-size: 0.78rem;
+            font-weight: 800;
+            transition: background 160ms ease, color 160ms ease, transform 160ms ease;
         }
 
         .btn:hover,
-        .btn.active {
-            background: var(--accent-blue);
-            border-color: var(--accent-blue);
-            color: var(--text-primary);
+        .btn:focus-visible {
+            background: var(--surface-solid);
+            color: var(--navy);
+            transform: translateY(-1px);
+            outline: none;
+        }
+
+        .btn.featured {
+            background: var(--navy);
+            color: #fffaf0;
         }
 
         .graph-container {
-            min-height: 300px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            min-height: 440px;
+            display: grid;
+            place-items: center;
+            overflow: hidden;
+            border: 1px solid rgba(19, 35, 63, 0.07);
+            border-radius: 20px;
+            background:
+                linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(255, 252, 244, 0.86)),
+                var(--surface-solid);
         }
 
         .spinner {
-            color: var(--text-secondary);
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+            color: var(--muted);
             font-size: 0.9rem;
+            font-weight: 800;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
         }
 
         .spinner::after {
-            content: '';
-            display: inline-block;
-            width: 16px;
-            height: 16px;
-            margin-left: 8px;
-            border: 2px solid var(--text-secondary);
-            border-top-color: transparent;
+            content: "";
+            width: 18px;
+            height: 18px;
+            border: 2px solid rgba(201, 154, 58, 0.24);
+            border-top-color: var(--gold);
             border-radius: 50%;
             animation: spin 1s linear infinite;
-            vertical-align: middle;
         }
 
         @keyframes spin {
@@ -148,112 +467,205 @@
                 transform: rotate(360deg);
             }
         }
+
+        @media (max-width: 1100px) {
+            body {
+                padding: 20px;
+            }
+
+            .hero {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 720px) {
+            .topbar,
+            .section-heading,
+            .card-header {
+                align-items: stretch;
+                flex-direction: column;
+            }
+
+            .hero-panel,
+            .insight-panel,
+            .card {
+                border-radius: 24px;
+            }
+
+            .hero-metrics {
+                grid-template-columns: 1fr;
+            }
+
+            .btn-group {
+                align-self: flex-start;
+                max-width: 100%;
+                overflow-x: auto;
+            }
+        }
     </style>
 </head>
 
 <body>
-    <div class="dashboard">
-        <header>
-            <h1>Financial Dashboard</h1>
-            <p>Household Balance Sheet & Cash Flow Analysis</p>
-            <a href="/input" class="btn" style="margin-top: 1rem; display: inline-block; text-decoration: none;">+ Add
-                Monthly Data</a>
-        </header>
+    <main class="dashboard">
+        <nav class="topbar" aria-label="Primary">
+            <a class="brand" href="/" aria-label="Financial dashboard home">
+                <span class="brand-mark" aria-hidden="true"></span>
+                BSPL Atelier
+            </a>
+            <div class="nav-actions">
+                <a href="/input" class="pill">Monthly input</a>
+                <a href="/input" class="pill pill-primary">Add new data</a>
+            </div>
+        </nav>
 
-        <div class="grid">
-            <!-- Net Worth Chart -->
-            <div class="card">
+        <section class="hero" aria-labelledby="dashboard-title">
+            <div class="hero-panel">
+                <span class="eyebrow">White Wealth Atelier</span>
+                <h1 id="dashboard-title">Your money, framed beautifully.</h1>
+                <p class="hero-copy">
+                    A calm, premium command center for household balance sheets, cash flow,
+                    allocation, returns, and FIRE progress. Every view is designed to feel
+                    airy, confident, and genuinely exciting to open.
+                </p>
+                <div class="hero-metrics" aria-label="Dashboard highlights">
+                    <div class="metric">
+                        <strong>6</strong>
+                        <span>Signature views</span>
+                    </div>
+                    <div class="metric">
+                        <strong>1Y</strong>
+                        <span>Focused review</span>
+                    </div>
+                    <div class="metric">
+                        <strong>+5Y</strong>
+                        <span>Future runway</span>
+                    </div>
+                </div>
+            </div>
+
+            <aside class="insight-panel" aria-label="Design note">
+                <div class="orbital-card">
+                    <div class="orbital-label">
+                        <strong>Quiet luxury.</strong>
+                        <span>Ivory canvas, navy structure, champagne accents, and spacious chart rooms.</span>
+                    </div>
+                </div>
+                <a href="/input" class="pill pill-primary">Update this month</a>
+            </aside>
+        </section>
+
+        <section class="section-heading" aria-labelledby="charts-title">
+            <h2 id="charts-title">Portfolio salon</h2>
+            <p>
+                Switch between recent, full-history, and forward-looking views without
+                losing the calm rhythm of the page.
+            </p>
+        </section>
+
+        <section class="grid" aria-label="Financial charts">
+            <article class="card">
                 <div class="card-header">
-                    <span class="card-title">Net Worth Trend</span>
-                    <div class="btn-group">
-                        <button class="btn" hx-get="/graphs/net-worth?months=12"
-                            hx-target="#net-worth-graph">1Y</button>
-                        <button class="btn" hx-get="/graphs/net-worth" hx-target="#net-worth-graph">All</button>
+                    <div>
+                        <span class="card-kicker">Balance sheet</span>
+                        <span class="card-title">Net Worth Trend</span>
+                    </div>
+                    <div class="btn-group" aria-label="Net worth range">
+                        <button class="btn" hx-get="/graphs/net-worth?months=12" hx-target="#net-worth-graph">1Y</button>
+                        <button class="btn featured" hx-get="/graphs/net-worth" hx-target="#net-worth-graph">All</button>
                         <button class="btn" hx-get="/graphs/net-worth?forecast=60" hx-target="#net-worth-graph">+5Y</button>
                     </div>
                 </div>
                 <div id="net-worth-graph" class="graph-container" hx-get="/graphs/net-worth" hx-trigger="load">
                     <span class="spinner">Loading</span>
                 </div>
-            </div>
+            </article>
 
-            <!-- Cash Flow Chart -->
-            <div class="card">
+            <article class="card">
                 <div class="card-header">
-                    <span class="card-title">Cash Flow</span>
-                    <div class="btn-group">
+                    <div>
+                        <span class="card-kicker">Monthly rhythm</span>
+                        <span class="card-title">Cash Flow</span>
+                    </div>
+                    <div class="btn-group" aria-label="Cash flow range">
                         <button class="btn" hx-get="/graphs/cashflow?months=12" hx-target="#cashflow-graph">1Y</button>
-                        <button class="btn" hx-get="/graphs/cashflow" hx-target="#cashflow-graph">All</button>
+                        <button class="btn featured" hx-get="/graphs/cashflow" hx-target="#cashflow-graph">All</button>
                         <button class="btn" hx-get="/graphs/cashflow?forecast=60" hx-target="#cashflow-graph">+5Y</button>
                     </div>
                 </div>
                 <div id="cashflow-graph" class="graph-container" hx-get="/graphs/cashflow" hx-trigger="load">
                     <span class="spinner">Loading</span>
                 </div>
-            </div>
+            </article>
 
-            <!-- Asset Allocation Chart -->
-            <div class="card">
+            <article class="card">
                 <div class="card-header">
-                    <span class="card-title">Asset Allocation</span>
-                    <div class="btn-group">
-                        <button class="btn" hx-get="/graphs/allocation?months=12"
-                            hx-target="#allocation-graph">1Y</button>
-                        <button class="btn" hx-get="/graphs/allocation" hx-target="#allocation-graph">All</button>
+                    <div>
+                        <span class="card-kicker">Composition</span>
+                        <span class="card-title">Asset Allocation</span>
+                    </div>
+                    <div class="btn-group" aria-label="Allocation range">
+                        <button class="btn" hx-get="/graphs/allocation?months=12" hx-target="#allocation-graph">1Y</button>
+                        <button class="btn featured" hx-get="/graphs/allocation" hx-target="#allocation-graph">All</button>
                         <button class="btn" hx-get="/graphs/allocation?forecast=60" hx-target="#allocation-graph">+5Y</button>
                     </div>
                 </div>
                 <div id="allocation-graph" class="graph-container" hx-get="/graphs/allocation" hx-trigger="load">
                     <span class="spinner">Loading</span>
                 </div>
-            </div>
+            </article>
 
-            <!-- Ratios Chart -->
-            <div class="card">
+            <article class="card">
                 <div class="card-header">
-                    <span class="card-title">Financial Ratios</span>
-                    <div class="btn-group">
+                    <div>
+                        <span class="card-kicker">Health signals</span>
+                        <span class="card-title">Financial Ratios</span>
+                    </div>
+                    <div class="btn-group" aria-label="Ratios range">
                         <button class="btn" hx-get="/graphs/ratios?months=12" hx-target="#ratios-graph">1Y</button>
-                        <button class="btn" hx-get="/graphs/ratios" hx-target="#ratios-graph">All</button>
+                        <button class="btn featured" hx-get="/graphs/ratios" hx-target="#ratios-graph">All</button>
                         <button class="btn" hx-get="/graphs/ratios?forecast=60" hx-target="#ratios-graph">+5Y</button>
                     </div>
                 </div>
                 <div id="ratios-graph" class="graph-container" hx-get="/graphs/ratios" hx-trigger="load">
                     <span class="spinner">Loading</span>
                 </div>
-            </div>
+            </article>
 
-            <!-- Returns Chart -->
-            <div class="card">
+            <article class="card">
                 <div class="card-header">
-                    <span class="card-title">Investment Returns (Benchmark: S&P 500 JPY)</span>
-                    <div class="btn-group">
+                    <div>
+                        <span class="card-kicker">Market lens</span>
+                        <span class="card-title">Investment Returns</span>
+                    </div>
+                    <div class="btn-group" aria-label="Returns range">
                         <button class="btn" hx-get="/graphs/returns?months=12" hx-target="#returns-graph">1Y</button>
-                        <button class="btn" hx-get="/graphs/returns" hx-target="#returns-graph">All</button>
+                        <button class="btn featured" hx-get="/graphs/returns" hx-target="#returns-graph">All</button>
                         <button class="btn" hx-get="/graphs/returns?forecast=60" hx-target="#returns-graph">+5Y</button>
                     </div>
                 </div>
                 <div id="returns-graph" class="graph-container" hx-get="/graphs/returns" hx-trigger="load">
                     <span class="spinner">Loading</span>
                 </div>
-            </div>
+            </article>
 
-            <!-- FI Chart -->
-            <div class="card">
+            <article class="card">
                 <div class="card-header">
-                    <span class="card-title">FI Ratios (FIRE Progress)</span>
-                    <div class="btn-group">
+                    <div>
+                        <span class="card-kicker">Runway</span>
+                        <span class="card-title">FI Ratios (FIRE Progress)</span>
+                    </div>
+                    <div class="btn-group" aria-label="FI range">
                         <button class="btn" hx-get="/graphs/fi?months=12" hx-target="#fi-graph">1Y</button>
-                        <button class="btn" hx-get="/graphs/fi" hx-target="#fi-graph">All</button>
+                        <button class="btn featured" hx-get="/graphs/fi" hx-target="#fi-graph">All</button>
                         <button class="btn" hx-get="/graphs/fi?forecast=60" hx-target="#fi-graph">+5Y</button>
                     </div>
                 </div>
                 <div id="fi-graph" class="graph-container" hx-get="/graphs/fi" hx-trigger="load">
                     <span class="spinner">Loading</span>
                 </div>
-            </div>
-        </div>
-    </div>
+            </article>
+        </section>
+    </main>
 </body>
 
 </html>

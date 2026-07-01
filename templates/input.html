@@ -3,232 +3,642 @@
 
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Monthly Input</title>
-    <script src="https://unpkg.com/htmx.org@2.0.1"></script>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='18' fill='%2317233f'/%3E%3Ccircle cx='25' cy='32' r='12' fill='none' stroke='%23f1dfb5' stroke-width='5'/%3E%3Ccircle cx='41' cy='32' r='8' fill='%23c99a3a'/%3E%3C/svg%3E">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
     <style>
-        body {
-            font-family: sans-serif;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
+        :root {
+            --canvas: #fbf8f1;
+            --surface: rgba(255, 255, 255, 0.88);
+            --surface-solid: #ffffff;
+            --ink: #13233f;
+            --muted: #788291;
+            --line: rgba(19, 35, 63, 0.1);
+            --gold: #c99a3a;
+            --gold-soft: #f1dfb5;
+            --navy: #17233f;
+            --danger: #b87460;
+            --shadow: 0 24px 80px rgba(23, 35, 63, 0.12);
+            --shadow-soft: 0 12px 32px rgba(23, 35, 63, 0.08);
         }
 
-        h1,
-        h2 {
-            color: #333;
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            min-height: 100vh;
+            color: var(--ink);
+            font-family: "Manrope", sans-serif;
+            background:
+                radial-gradient(circle at 8% 8%, rgba(241, 223, 181, 0.7), transparent 34rem),
+                radial-gradient(circle at 92% 0%, rgba(115, 139, 115, 0.2), transparent 30rem),
+                linear-gradient(135deg, #fffdf8 0%, var(--canvas) 54%, #f6efe0 100%);
+            padding: 32px;
+        }
+
+        body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            background-image:
+                linear-gradient(rgba(19, 35, 63, 0.035) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(19, 35, 63, 0.035) 1px, transparent 1px);
+            background-size: 44px 44px;
+            mask-image: linear-gradient(to bottom, black, transparent 78%);
+        }
+
+        a {
+            color: inherit;
+        }
+
+        .page {
+            position: relative;
+            width: min(1180px, 100%);
+            margin: 0 auto;
+        }
+
+        .topbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 20px;
+            margin-bottom: 28px;
+        }
+
+        .brand {
+            display: inline-flex;
+            align-items: center;
+            gap: 14px;
+            color: var(--navy);
+            text-decoration: none;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        .brand-mark {
+            width: 44px;
+            height: 44px;
+            display: grid;
+            place-items: center;
+            border-radius: 50%;
+            background: linear-gradient(145deg, var(--navy), #263b67);
+            box-shadow: 0 12px 32px rgba(23, 35, 63, 0.24);
+        }
+
+        .brand-mark::before {
+            content: "";
+            width: 16px;
+            height: 16px;
+            border: 2px solid var(--gold-soft);
+            border-radius: 50%;
+            box-shadow: 10px 0 0 -3px var(--gold);
+        }
+
+        .pill {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 44px;
+            padding: 0 18px;
+            border: 1px solid var(--line);
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.76);
+            color: var(--muted);
+            text-decoration: none;
+            font-weight: 800;
+            font-size: 0.88rem;
+            box-shadow: var(--shadow-soft);
+            backdrop-filter: blur(16px);
+            transition: transform 180ms ease, color 180ms ease;
+        }
+
+        .pill:hover {
+            transform: translateY(-2px);
+            color: var(--ink);
+        }
+
+        .hero {
+            display: grid;
+            grid-template-columns: minmax(0, 1.1fr) minmax(300px, 0.9fr);
+            gap: 24px;
+            align-items: stretch;
+            margin-bottom: 24px;
+        }
+
+        .hero-panel,
+        .method-panel,
+        section {
+            border: 1px solid rgba(255, 255, 255, 0.72);
+            background: var(--surface);
+            box-shadow: var(--shadow);
+            backdrop-filter: blur(22px);
+        }
+
+        .hero-panel {
+            border-radius: 34px;
+            padding: clamp(30px, 6vw, 64px);
+            overflow: hidden;
+            position: relative;
+        }
+
+        .hero-panel::after {
+            content: "";
+            position: absolute;
+            right: -120px;
+            top: -140px;
+            width: 360px;
+            height: 360px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(201, 154, 58, 0.34), transparent 66%);
+        }
+
+        .eyebrow {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 24px;
+            color: var(--gold);
+            font-size: 0.78rem;
+            font-weight: 800;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+        }
+
+        .eyebrow::before {
+            content: "";
+            width: 38px;
+            height: 1px;
+            background: var(--gold);
+        }
+
+        h1 {
+            position: relative;
+            z-index: 1;
+            max-width: 720px;
+            color: var(--navy);
+            font-family: "Playfair Display", serif;
+            font-size: clamp(3rem, 7vw, 6.6rem);
+            line-height: 0.92;
+            letter-spacing: -0.07em;
+        }
+
+        .hero-copy {
+            position: relative;
+            z-index: 1;
+            max-width: 640px;
+            margin-top: 26px;
+            color: var(--muted);
+            font-size: 1.05rem;
+            line-height: 1.85;
+        }
+
+        .method-panel {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            gap: 24px;
+            border-radius: 34px;
+            padding: 32px;
+        }
+
+        .method-panel h2,
+        section h2 {
+            color: var(--navy);
+            font-family: "Playfair Display", serif;
+            font-size: 2rem;
+            letter-spacing: -0.04em;
+        }
+
+        .method-panel p {
+            margin-top: 8px;
+            color: var(--muted);
+            line-height: 1.7;
+        }
+
+        .method-tabs {
+            display: grid;
+            gap: 10px;
+        }
+
+        .method-tab {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+            padding: 16px 18px;
+            border: 1px solid var(--line);
+            border-radius: 18px;
+            background: rgba(255, 255, 255, 0.68);
+            color: var(--muted);
+            text-decoration: none;
+            font-weight: 800;
+        }
+
+        .method-tab.active {
+            border-color: rgba(201, 154, 58, 0.44);
+            background: linear-gradient(135deg, #17233f, #273a66);
+            color: #fffaf0;
+            box-shadow: 0 18px 44px rgba(23, 35, 63, 0.18);
+        }
+
+        form {
+            display: grid;
+            gap: 24px;
         }
 
         section {
-            margin-bottom: 30px;
-            border: 1px solid #ddd;
-            padding: 15px;
-            border-radius: 5px;
+            border-radius: 28px;
+            padding: 28px;
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 20px;
+            margin-bottom: 18px;
+        }
+
+        .section-note {
+            color: var(--muted);
+            font-size: 0.9rem;
+            font-weight: 700;
+        }
+
+        .field {
+            display: grid;
+            gap: 10px;
+        }
+
+        label {
+            color: var(--muted);
+            font-size: 0.78rem;
+            font-weight: 800;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+        }
+
+        .table-wrap {
+            overflow-x: auto;
+            border: 1px solid var(--line);
+            border-radius: 22px;
+            background: rgba(255, 255, 255, 0.7);
         }
 
         table {
             width: 100%;
+            min-width: 720px;
             border-collapse: collapse;
-            margin-top: 10px;
         }
 
         th,
         td {
             text-align: left;
-            padding: 8px;
-            border-bottom: 1px solid #eee;
+            padding: 15px 16px;
+            border-bottom: 1px solid rgba(19, 35, 63, 0.08);
+        }
+
+        th {
+            color: var(--muted);
+            font-size: 0.72rem;
+            font-weight: 800;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            background: rgba(246, 239, 224, 0.62);
+        }
+
+        tr:last-child td {
+            border-bottom: 0;
         }
 
         input[type="number"],
         input[type="text"],
         input[type="month"] {
             width: 100%;
-            padding: 5px;
-            box-sizing: border-box;
+            min-height: 46px;
+            border: 1px solid rgba(19, 35, 63, 0.12);
+            border-radius: 14px;
+            background: rgba(255, 255, 255, 0.84);
+            color: var(--ink);
+            font: inherit;
+            font-weight: 700;
+            padding: 0 14px;
+            outline: none;
+            transition: border-color 160ms ease, box-shadow 160ms ease;
+        }
+
+        input:focus {
+            border-color: rgba(201, 154, 58, 0.7);
+            box-shadow: 0 0 0 4px rgba(201, 154, 58, 0.14);
+        }
+
+        input[readonly] {
+            color: var(--muted);
+            background: rgba(246, 239, 224, 0.58);
+        }
+
+        .button-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 14px;
+            flex-wrap: wrap;
+            margin-top: 18px;
         }
 
         button {
-            background: #007bff;
-            color: white;
-            border: none;
-            padding: 10px 20px;
+            min-height: 46px;
+            border: 0;
+            border-radius: 999px;
+            padding: 0 20px;
             cursor: pointer;
-            border-radius: 4px;
+            color: var(--navy);
+            background: #fff;
+            box-shadow: var(--shadow-soft);
+            font: inherit;
+            font-size: 0.88rem;
+            font-weight: 800;
+            transition: transform 180ms ease, box-shadow 180ms ease;
         }
 
         button:hover {
-            background: #0056b3;
+            transform: translateY(-2px);
+            box-shadow: 0 18px 42px rgba(23, 35, 63, 0.14);
+        }
+
+        .save-button {
+            min-height: 56px;
+            padding: 0 30px;
+            background: linear-gradient(135deg, #17233f 0%, #273a66 52%, #c99a3a 180%);
+            color: #fffaf0;
         }
 
         .row-del {
-            color: red;
+            width: 52px;
+            color: var(--danger);
             cursor: pointer;
             text-align: center;
+            font-weight: 800;
+        }
+
+        .row-del:hover {
+            color: #8e4f40;
         }
 
         .actions {
-            text-align: right;
-            margin-top: 20px;
+            display: flex;
+            justify-content: flex-end;
+            padding-bottom: 12px;
+        }
+
+        @media (max-width: 920px) {
+            body {
+                padding: 20px;
+            }
+
+            .hero {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 640px) {
+            .topbar,
+            .section-header,
+            .button-row,
+            .actions {
+                align-items: stretch;
+                flex-direction: column;
+            }
+
+            .topbar {
+                align-items: flex-start;
+            }
+
+            section,
+            .hero-panel,
+            .method-panel {
+                border-radius: 24px;
+                padding: 22px;
+            }
         }
     </style>
 </head>
 
 <body>
-    <h1>Monthly Financial Input</h1>
-
-    <div style="margin-bottom: 20px; padding: 10px; background-color: #f8f9fa; border-radius: 5px;">
-        <strong>Auto-Fill Method (Moving Average):</strong>
-        <span style="margin-left: 10px;">
-            <a href="/input?ma_months=6" 
-               style="margin-right: 15px; text-decoration: none; {{ 'font-weight: bold; color: #0056b3; border-bottom: 2px solid #0056b3;' if ma_months == 6 else 'color: #6c757d;' }}">
-               6 Months (Default)
+    <main class="page">
+        <nav class="topbar" aria-label="Primary">
+            <a class="brand" href="/" aria-label="Back to dashboard">
+                <span class="brand-mark" aria-hidden="true"></span>
+                BSPL Atelier
             </a>
-            <a href="/input?ma_months=12" 
-               style="margin-right: 15px; text-decoration: none; {{ 'font-weight: bold; color: #0056b3; border-bottom: 2px solid #0056b3;' if ma_months == 12 else 'color: #6c757d;' }}">
-               1 Year
-            </a>
-            <a href="/input?ma_months=60" 
-               style="text-decoration: none; {{ 'font-weight: bold; color: #0056b3; border-bottom: 2px solid #0056b3;' if ma_months == 60 else 'color: #6c757d;' }}">
-               5 Years
-            </a>
-        </span>
-    </div>
+            <a class="pill" href="/">Back to dashboard</a>
+        </nav>
 
-    <form method="POST" action="/input">
-        <section>
-            <h2>Target Month</h2>
-            <input type="month" name="target_month" value="{{ target_month }}" required>
+        <section class="hero" aria-labelledby="input-title">
+            <div class="hero-panel">
+                <span class="eyebrow">Monthly ritual</span>
+                <h1 id="input-title">Make this month official.</h1>
+                <p class="hero-copy">
+                    Review the moving-average draft, refine the details, and save a
+                    clean monthly snapshot for your future self.
+                </p>
+            </div>
+
+            <aside class="method-panel" aria-labelledby="method-title">
+                <div>
+                    <h2 id="method-title">Auto-fill method</h2>
+                    <p>Choose the moving-average window used to prefill this form.</p>
+                </div>
+                <div class="method-tabs">
+                    <a href="/input?ma_months=6" class="method-tab {{ 'active' if ma_months == 6 else '' }}">
+                        <span>6 Months</span>
+                        <small>Default</small>
+                    </a>
+                    <a href="/input?ma_months=12" class="method-tab {{ 'active' if ma_months == 12 else '' }}">
+                        <span>1 Year</span>
+                        <small>Smoother</small>
+                    </a>
+                    <a href="/input?ma_months=60" class="method-tab {{ 'active' if ma_months == 60 else '' }}">
+                        <span>5 Years</span>
+                        <small>Long view</small>
+                    </a>
+                </div>
+            </aside>
         </section>
 
-        <section>
-            <h2>Income</h2>
-            <table id="income-table">
-                <thead>
-                    <tr>
-                        <th>Name</th>
-                        <th>Account ID</th>
-                        <th>Amount</th>
-                        <th></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for item in income_items %}
-                    <tr>
-                        <td>{{ item.name }}</td>
-                        <td><input type="text" name="income_account[]" value="{{ item.account_id }}" readonly
-                                style="background:#f9f9f9"></td>
-                        <td><input type="number" name="income_amount[]" value="{{ item.amount }}"></td>
-                        <td class="row-del" onclick="this.parentElement.remove()">x</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-            <button type="button" onclick="addRow('income-table', 'income')">Add Income Row</button>
-        </section>
+        <form method="POST" action="/input">
+            <section>
+                <div class="section-header">
+                    <h2>Target Month</h2>
+                    <span class="section-note">The month this snapshot belongs to.</span>
+                </div>
+                <div class="field">
+                    <label for="target_month">Month</label>
+                    <input id="target_month" type="month" name="target_month" value="{{ target_month }}" required>
+                </div>
+            </section>
 
+            <section>
+                <div class="section-header">
+                    <h2>Income</h2>
+                    <span class="section-note">Expected incoming cash for the month.</span>
+                </div>
+                <div class="table-wrap">
+                    <table id="income-table">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Account ID</th>
+                                <th>Amount</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in income_items %}
+                            <tr>
+                                <td>{{ item.name }}</td>
+                                <td><input type="text" name="income_account[]" value="{{ item.account_id }}" readonly></td>
+                                <td><input type="number" name="income_amount[]" value="{{ item.amount }}"></td>
+                                <td class="row-del" onclick="this.parentElement.remove()">x</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <div class="button-row">
+                    <span class="section-note">Add a custom income source when needed.</span>
+                    <button type="button" onclick="addRow('income-table', 'income')">Add Income Row</button>
+                </div>
+            </section>
 
-        <section>
-            <h2>Credit Cards</h2>
-            <table id="card-table">
-                <thead>
-                    <tr>
-                        <th>Name</th>
-                        <th>Method ID</th>
-                        <th>Amount</th>
-                        <th></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for item in card_items %}
-                    <tr>
-                        <td>{{ item.name }}</td>
-                        <td><input type="text" name="expense_method[]" value="{{ item.method_id }}" readonly
-                                style="background:#f9f9f9"></td>
-                        <td><input type="number" name="expense_amount[]" value="{{ item.amount }}"></td>
-                        <td class="row-del" onclick="this.parentElement.remove()">x</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </section>
+            <section>
+                <div class="section-header">
+                    <h2>Credit Cards</h2>
+                    <span class="section-note">Settlement-based expenses from registered cards.</span>
+                </div>
+                <div class="table-wrap">
+                    <table id="card-table">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Method ID</th>
+                                <th>Amount</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in card_items %}
+                            <tr>
+                                <td>{{ item.name }}</td>
+                                <td><input type="text" name="expense_method[]" value="{{ item.method_id }}" readonly></td>
+                                <td><input type="number" name="expense_amount[]" value="{{ item.amount }}"></td>
+                                <td class="row-del" onclick="this.parentElement.remove()">x</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
 
-        <section>
-            <h2>Other Expenses</h2>
-            <table id="other-expense-table">
-                <thead>
-                    <tr>
-                        <th>Name</th>
-                        <th>Method ID</th>
-                        <th>Amount</th>
-                        <th></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for item in other_expense_items %}
-                    <tr>
-                        <td>{{ item.name }}</td>
-                        <td><input type="text" name="expense_method[]" value="{{ item.method_id }}" readonly
-                                style="background:#f9f9f9"></td>
-                        <td><input type="number" name="expense_amount[]" value="{{ item.amount }}"></td>
-                        <td class="row-del" onclick="this.parentElement.remove()">x</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-            <button type="button" onclick="addRow('other-expense-table', 'expense')">Add Expense Row</button>
-        </section>
+            <section>
+                <div class="section-header">
+                    <h2>Other Expenses</h2>
+                    <span class="section-note">Cash, transfers, and non-card spending.</span>
+                </div>
+                <div class="table-wrap">
+                    <table id="other-expense-table">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Method ID</th>
+                                <th>Amount</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in other_expense_items %}
+                            <tr>
+                                <td>{{ item.name }}</td>
+                                <td><input type="text" name="expense_method[]" value="{{ item.method_id }}" readonly></td>
+                                <td><input type="number" name="expense_amount[]" value="{{ item.amount }}"></td>
+                                <td class="row-del" onclick="this.parentElement.remove()">x</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <div class="button-row">
+                    <span class="section-note">Add one-off or manual spending lines here.</span>
+                    <button type="button" onclick="addRow('other-expense-table', 'expense')">Add Expense Row</button>
+                </div>
+            </section>
 
+            <section>
+                <div class="section-header">
+                    <h2>Assets</h2>
+                    <span class="section-note">Balances projected from the latest known snapshot.</span>
+                </div>
+                <div class="table-wrap">
+                    <table id="asset-table">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Account ID</th>
+                                <th>Class</th>
+                                <th>Balance</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in asset_items %}
+                            <tr>
+                                <td>{{ item.name }}</td>
+                                <td><input type="text" name="asset_account[]" value="{{ item.account_id }}" readonly></td>
+                                <td><input type="text" name="asset_class[]" value="{{ item.asset_class }}" readonly></td>
+                                <td><input type="number" name="asset_balance[]" value="{{ item.balance }}"></td>
+                                <td class="row-del" onclick="this.parentElement.remove()">x</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
 
-        <section>
-            <h2>Assets (Balances)</h2>
-            <table id="asset-table">
-                <thead>
-                    <tr>
-                        <th>Name</th>
-                        <th>Account ID</th>
-                        <th>Class</th>
-                        <th>Balance</th>
-                        <th></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for item in asset_items %}
-                    <tr>
-                        <td>{{ item.name }}</td>
-                        <td><input type="text" name="asset_account[]" value="{{ item.account_id }}" readonly
-                                style="background:#f9f9f9"></td>
-                        <td><input type="text" name="asset_class[]" value="{{ item.asset_class }}" readonly
-                                style="background:#f9f9f9"></td>
-                        <td><input type="number" name="asset_balance[]" value="{{ item.balance }}"></td>
-                        <td class="row-del" onclick="this.parentElement.remove()">x</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </section>
-
-
-        <div class="actions">
-            <button type="submit">Save All Data</button>
-        </div>
-    </form>
+            <div class="actions">
+                <button class="save-button" type="submit">Save All Data</button>
+            </div>
+        </form>
+    </main>
 
     <script>
         function addRow(tableId, type) {
-            const tbody = document.getElementById(tableId).querySelector('tbody');
-            const newRow = document.createElement('tr');
-            if (type === 'income') {
+            const tbody = document.getElementById(tableId).querySelector("tbody");
+            const newRow = document.createElement("tr");
+
+            if (type === "income") {
                 newRow.innerHTML = `
+                    <td>Custom income</td>
                     <td><input type="text" name="income_account[]" placeholder="Account ID"></td>
                     <td><input type="number" name="income_amount[]" value="0"></td>
                     <td class="row-del" onclick="this.parentElement.remove()">x</td>
                 `;
-            } else if (type === 'expense') {
+            } else if (type === "expense") {
                 newRow.innerHTML = `
+                    <td>Custom expense</td>
                     <td><input type="text" name="expense_method[]" placeholder="Method ID"></td>
                     <td><input type="number" name="expense_amount[]" value="0"></td>
                     <td class="row-del" onclick="this.parentElement.remove()">x</td>
                 `;
             }
+
             tbody.appendChild(newRow);
         }
     </script>
