@@ -1,14 +1,11 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ja">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Financial Dashboard</title>
+    <title>家計ダッシュボード</title>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='18' fill='%2317233f'/%3E%3Ccircle cx='25' cy='32' r='12' fill='none' stroke='%23f1dfb5' stroke-width='5'/%3E%3Ccircle cx='41' cy='32' r='8' fill='%23c99a3a'/%3E%3C/svg%3E">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.plot.ly/plotly-3.3.0.min.js"></script>
     <script src="https://unpkg.com/htmx.org@2.0.1"></script>
     <style>
@@ -40,7 +37,7 @@
         body {
             min-height: 100vh;
             color: var(--ink);
-            font-family: "Manrope", sans-serif;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
             background:
                 radial-gradient(circle at 7% 10%, rgba(241, 223, 181, 0.65), transparent 34rem),
                 radial-gradient(circle at 90% 3%, rgba(115, 139, 115, 0.22), transparent 30rem),
@@ -507,161 +504,116 @@
 
 <body>
     <main class="dashboard">
-        <nav class="topbar" aria-label="Primary">
-            <a class="brand" href="/" aria-label="Financial dashboard home">
+        <nav class="topbar" aria-label="メイン">
+            <a class="brand" href="/" aria-label="ダッシュボード">
                 <span class="brand-mark" aria-hidden="true"></span>
-                BSPL Atelier
+                BSPL
             </a>
             <div class="nav-actions">
-                <a href="/input" class="pill">Monthly input</a>
-                <a href="/input" class="pill pill-primary">Add new data</a>
+                <a href="/input" class="pill pill-primary">月次入力</a>
             </div>
         </nav>
 
-        <section class="hero" aria-labelledby="dashboard-title">
-            <div class="hero-panel">
-                <span class="eyebrow">White Wealth Atelier</span>
-                <h1 id="dashboard-title">Your money, framed beautifully.</h1>
-                <p class="hero-copy">
-                    A calm, premium command center for household balance sheets, cash flow,
-                    allocation, returns, and FIRE progress. Every view is designed to feel
-                    airy, confident, and genuinely exciting to open.
-                </p>
-                <div class="hero-metrics" aria-label="Dashboard highlights">
-                    <div class="metric">
-                        <strong>6</strong>
-                        <span>Signature views</span>
-                    </div>
-                    <div class="metric">
-                        <strong>1Y</strong>
-                        <span>Focused review</span>
-                    </div>
-                    <div class="metric">
-                        <strong>+5Y</strong>
-                        <span>Future runway</span>
-                    </div>
-                </div>
-            </div>
-
-            <aside class="insight-panel" aria-label="Design note">
-                <div class="orbital-card">
-                    <div class="orbital-label">
-                        <strong>Quiet luxury.</strong>
-                        <span>Ivory canvas, navy structure, champagne accents, and spacious chart rooms.</span>
-                    </div>
-                </div>
-                <a href="/input" class="pill pill-primary">Update this month</a>
-            </aside>
-        </section>
-
-        <section class="section-heading" aria-labelledby="charts-title">
-            <h2 id="charts-title">Portfolio salon</h2>
-            <p>
-                Switch between recent, full-history, and forward-looking views without
-                losing the calm rhythm of the page.
-            </p>
-        </section>
-
-        <section class="grid" aria-label="Financial charts">
+        <section class="grid" aria-label="家計グラフ">
             <article class="card">
                 <div class="card-header">
                     <div>
-                        <span class="card-kicker">Balance sheet</span>
-                        <span class="card-title">Net Worth Trend</span>
+                        <span class="card-kicker">貸借対照</span>
+                        <span class="card-title">純資産</span>
                     </div>
-                    <div class="btn-group" aria-label="Net worth range">
-                        <button class="btn" hx-get="/graphs/net-worth?months=12" hx-target="#net-worth-graph">1Y</button>
-                        <button class="btn featured" hx-get="/graphs/net-worth" hx-target="#net-worth-graph">All</button>
-                        <button class="btn" hx-get="/graphs/net-worth?forecast=60" hx-target="#net-worth-graph">+5Y</button>
+                    <div class="btn-group" aria-label="純資産の表示期間">
+                        <button class="btn" hx-get="/graphs/net-worth?months=12" hx-target="#net-worth-graph">1年</button>
+                        <button class="btn featured" hx-get="/graphs/net-worth" hx-target="#net-worth-graph">全期間</button>
+                        <button class="btn" hx-get="/graphs/net-worth?forecast=60" hx-target="#net-worth-graph">5年予測</button>
                     </div>
                 </div>
                 <div id="net-worth-graph" class="graph-container" hx-get="/graphs/net-worth" hx-trigger="load">
-                    <span class="spinner">Loading</span>
+                    <span class="spinner">読み込み中</span>
                 </div>
             </article>
 
             <article class="card">
                 <div class="card-header">
                     <div>
-                        <span class="card-kicker">Monthly rhythm</span>
-                        <span class="card-title">Cash Flow</span>
+                        <span class="card-kicker">月次</span>
+                        <span class="card-title">収支</span>
                     </div>
-                    <div class="btn-group" aria-label="Cash flow range">
-                        <button class="btn" hx-get="/graphs/cashflow?months=12" hx-target="#cashflow-graph">1Y</button>
-                        <button class="btn featured" hx-get="/graphs/cashflow" hx-target="#cashflow-graph">All</button>
-                        <button class="btn" hx-get="/graphs/cashflow?forecast=60" hx-target="#cashflow-graph">+5Y</button>
+                    <div class="btn-group" aria-label="収支の表示期間">
+                        <button class="btn" hx-get="/graphs/cashflow?months=12" hx-target="#cashflow-graph">1年</button>
+                        <button class="btn featured" hx-get="/graphs/cashflow" hx-target="#cashflow-graph">全期間</button>
+                        <button class="btn" hx-get="/graphs/cashflow?forecast=60" hx-target="#cashflow-graph">5年予測</button>
                     </div>
                 </div>
                 <div id="cashflow-graph" class="graph-container" hx-get="/graphs/cashflow" hx-trigger="load">
-                    <span class="spinner">Loading</span>
+                    <span class="spinner">読み込み中</span>
                 </div>
             </article>
 
             <article class="card">
                 <div class="card-header">
                     <div>
-                        <span class="card-kicker">Composition</span>
-                        <span class="card-title">Asset Allocation</span>
+                        <span class="card-kicker">構成</span>
+                        <span class="card-title">資産配分</span>
                     </div>
-                    <div class="btn-group" aria-label="Allocation range">
-                        <button class="btn" hx-get="/graphs/allocation?months=12" hx-target="#allocation-graph">1Y</button>
-                        <button class="btn featured" hx-get="/graphs/allocation" hx-target="#allocation-graph">All</button>
-                        <button class="btn" hx-get="/graphs/allocation?forecast=60" hx-target="#allocation-graph">+5Y</button>
+                    <div class="btn-group" aria-label="資産配分の表示期間">
+                        <button class="btn" hx-get="/graphs/allocation?months=12" hx-target="#allocation-graph">1年</button>
+                        <button class="btn featured" hx-get="/graphs/allocation" hx-target="#allocation-graph">全期間</button>
+                        <button class="btn" hx-get="/graphs/allocation?forecast=60" hx-target="#allocation-graph">5年予測</button>
                     </div>
                 </div>
                 <div id="allocation-graph" class="graph-container" hx-get="/graphs/allocation" hx-trigger="load">
-                    <span class="spinner">Loading</span>
+                    <span class="spinner">読み込み中</span>
                 </div>
             </article>
 
             <article class="card">
                 <div class="card-header">
                     <div>
-                        <span class="card-kicker">Health signals</span>
-                        <span class="card-title">Financial Ratios</span>
+                        <span class="card-kicker">健全性</span>
+                        <span class="card-title">財務比率</span>
                     </div>
-                    <div class="btn-group" aria-label="Ratios range">
-                        <button class="btn" hx-get="/graphs/ratios?months=12" hx-target="#ratios-graph">1Y</button>
-                        <button class="btn featured" hx-get="/graphs/ratios" hx-target="#ratios-graph">All</button>
-                        <button class="btn" hx-get="/graphs/ratios?forecast=60" hx-target="#ratios-graph">+5Y</button>
+                    <div class="btn-group" aria-label="財務比率の表示期間">
+                        <button class="btn" hx-get="/graphs/ratios?months=12" hx-target="#ratios-graph">1年</button>
+                        <button class="btn featured" hx-get="/graphs/ratios" hx-target="#ratios-graph">全期間</button>
+                        <button class="btn" hx-get="/graphs/ratios?forecast=60" hx-target="#ratios-graph">5年予測</button>
                     </div>
                 </div>
                 <div id="ratios-graph" class="graph-container" hx-get="/graphs/ratios" hx-trigger="load">
-                    <span class="spinner">Loading</span>
+                    <span class="spinner">読み込み中</span>
                 </div>
             </article>
 
             <article class="card">
                 <div class="card-header">
                     <div>
-                        <span class="card-kicker">Market lens</span>
-                        <span class="card-title">Investment Returns</span>
+                        <span class="card-kicker">運用</span>
+                        <span class="card-title">投資リターン</span>
                     </div>
-                    <div class="btn-group" aria-label="Returns range">
-                        <button class="btn" hx-get="/graphs/returns?months=12" hx-target="#returns-graph">1Y</button>
-                        <button class="btn featured" hx-get="/graphs/returns" hx-target="#returns-graph">All</button>
-                        <button class="btn" hx-get="/graphs/returns?forecast=60" hx-target="#returns-graph">+5Y</button>
+                    <div class="btn-group" aria-label="投資リターンの表示期間">
+                        <button class="btn" hx-get="/graphs/returns?months=12" hx-target="#returns-graph">1年</button>
+                        <button class="btn featured" hx-get="/graphs/returns" hx-target="#returns-graph">全期間</button>
+                        <button class="btn" hx-get="/graphs/returns?forecast=60" hx-target="#returns-graph">5年予測</button>
                     </div>
                 </div>
                 <div id="returns-graph" class="graph-container" hx-get="/graphs/returns" hx-trigger="load">
-                    <span class="spinner">Loading</span>
+                    <span class="spinner">読み込み中</span>
                 </div>
             </article>
 
             <article class="card">
                 <div class="card-header">
                     <div>
-                        <span class="card-kicker">Runway</span>
-                        <span class="card-title">FI Ratios (FIRE Progress)</span>
+                        <span class="card-kicker">自立度</span>
+                        <span class="card-title">FI比率</span>
                     </div>
-                    <div class="btn-group" aria-label="FI range">
-                        <button class="btn" hx-get="/graphs/fi?months=12" hx-target="#fi-graph">1Y</button>
-                        <button class="btn featured" hx-get="/graphs/fi" hx-target="#fi-graph">All</button>
-                        <button class="btn" hx-get="/graphs/fi?forecast=60" hx-target="#fi-graph">+5Y</button>
+                    <div class="btn-group" aria-label="FI比率の表示期間">
+                        <button class="btn" hx-get="/graphs/fi?months=12" hx-target="#fi-graph">1年</button>
+                        <button class="btn featured" hx-get="/graphs/fi" hx-target="#fi-graph">全期間</button>
+                        <button class="btn" hx-get="/graphs/fi?forecast=60" hx-target="#fi-graph">5年予測</button>
                     </div>
                 </div>
                 <div id="fi-graph" class="graph-container" hx-get="/graphs/fi" hx-trigger="load">
-                    <span class="spinner">Loading</span>
+                    <span class="spinner">読み込み中</span>
                 </div>
             </article>
         </section>

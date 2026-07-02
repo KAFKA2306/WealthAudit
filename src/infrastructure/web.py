@@ -124,7 +124,7 @@ def create_app() -> Flask:
             return redirect(url_for("dashboard"))
 
         else:
-            ma_months = request.args.get("ma_months", default=6, type=int)
+            prefill_months = 6
             
             income_df = load_csv("income.csv")
             expense_df = load_csv("expense.csv")
@@ -140,7 +140,7 @@ def create_app() -> Flask:
                 target_month = (last_date + relativedelta(months=1)).strftime("%Y-%m")
 
             months_list = (
-                sorted(income_df["month"].unique())[-ma_months:]
+                sorted(income_df["month"].unique())[-prefill_months:]
                 if not income_df.empty
                 else []
             )
@@ -181,7 +181,7 @@ def create_app() -> Flask:
             )
 
             if not expense_df.empty and not methods_df.empty:
-                exp_months = sorted(expense_df["month"].unique())[-ma_months:]
+                exp_months = sorted(expense_df["month"].unique())[-prefill_months:]
                 recent_exp = expense_df[expense_df["month"].isin(exp_months)]
 
                 for _, method in methods_df.iterrows():
@@ -201,7 +201,7 @@ def create_app() -> Flask:
 
             asset_items = []
             if not asset_df.empty:
-                asset_months = sorted(asset_df["month"].unique())[-ma_months:]
+                asset_months = sorted(asset_df["month"].unique())[-prefill_months:]
                 recent_assets = asset_df[asset_df["month"].isin(asset_months)]
                 last_month_str = asset_df["month"].iloc[-1]
 
@@ -249,7 +249,6 @@ def create_app() -> Flask:
                 card_items=card_items,
                 other_expense_items=other_expense_items,
                 asset_items=asset_items,
-                ma_months=ma_months,
             )
 
     @app.route("/graphs/net-worth")

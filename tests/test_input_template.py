@@ -35,10 +35,43 @@ def test_input_page_has_one_non_nested_form_with_unique_ids() -> None:
     response = create_app().test_client().get("/input")
 
     parser = InputTemplateParser()
-    parser.feed(response.get_data(as_text=True))
+    html = response.get_data(as_text=True)
+    parser.feed(html)
 
     assert response.status_code == 200
     assert parser.form_count == 1
     assert parser.form_depth == 0
     assert parser.nested_form_positions == []
     assert parser.duplicate_ids == {}
+
+
+def test_input_page_uses_single_japanese_monthly_entry_flow() -> None:
+    response = create_app().test_client().get("/input")
+    html = response.get_data(as_text=True)
+
+    assert response.status_code == 200
+    assert '<html lang="ja">' in html
+    assert "月次入力" in html
+    assert "対象月" in html
+    assert "保存" in html
+    assert "ma_months=" not in html
+    assert "Auto-fill method" not in html
+    assert "6 Months" not in html
+    assert "1 Year" not in html
+    assert "5 Years" not in html
+
+
+def test_dashboard_has_one_monthly_entry_link_and_no_marketing_copy() -> None:
+    response = create_app().test_client().get("/")
+    html = response.get_data(as_text=True)
+
+    assert response.status_code == 200
+    assert '<html lang="ja">' in html
+    assert html.count('href="/input"') == 1
+    assert ">月次入力</a>" in html
+    assert "Add new data" not in html
+    assert "Update this month" not in html
+    assert "White Wealth Atelier" not in html
+    assert "Your money" not in html
+    assert "Quiet luxury" not in html
+    assert "Signature views" not in html

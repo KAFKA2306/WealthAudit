@@ -1,14 +1,11 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ja">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Monthly Input</title>
+    <title>月次入力</title>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='18' fill='%2317233f'/%3E%3Ccircle cx='25' cy='32' r='12' fill='none' stroke='%23f1dfb5' stroke-width='5'/%3E%3Ccircle cx='41' cy='32' r='8' fill='%23c99a3a'/%3E%3C/svg%3E">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
     <style>
         :root {
             --canvas: #fbf8f1;
@@ -34,7 +31,7 @@
         body {
             min-height: 100vh;
             color: var(--ink);
-            font-family: "Manrope", sans-serif;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
             background:
                 radial-gradient(circle at 8% 8%, rgba(241, 223, 181, 0.7), transparent 34rem),
                 radial-gradient(circle at 92% 0%, rgba(115, 139, 115, 0.2), transparent 30rem),
@@ -125,16 +122,6 @@
             color: var(--ink);
         }
 
-        .hero {
-            display: grid;
-            grid-template-columns: minmax(0, 1.1fr) minmax(300px, 0.9fr);
-            gap: 24px;
-            align-items: stretch;
-            margin-bottom: 24px;
-        }
-
-        .hero-panel,
-        .method-panel,
         section {
             border: 1px solid rgba(255, 255, 255, 0.72);
             background: var(--surface);
@@ -142,111 +129,17 @@
             backdrop-filter: blur(22px);
         }
 
-        .hero-panel {
-            border-radius: 34px;
-            padding: clamp(30px, 6vw, 64px);
-            overflow: hidden;
-            position: relative;
-        }
-
-        .hero-panel::after {
-            content: "";
-            position: absolute;
-            right: -120px;
-            top: -140px;
-            width: 360px;
-            height: 360px;
-            border-radius: 50%;
-            background: radial-gradient(circle, rgba(201, 154, 58, 0.34), transparent 66%);
-        }
-
-        .eyebrow {
-            display: inline-flex;
-            align-items: center;
-            gap: 10px;
-            margin-bottom: 24px;
-            color: var(--gold);
-            font-size: 0.78rem;
-            font-weight: 800;
-            letter-spacing: 0.18em;
-            text-transform: uppercase;
-        }
-
-        .eyebrow::before {
-            content: "";
-            width: 38px;
-            height: 1px;
-            background: var(--gold);
-        }
-
         h1 {
-            position: relative;
-            z-index: 1;
-            max-width: 720px;
             color: var(--navy);
-            font-family: "Playfair Display", serif;
-            font-size: clamp(3rem, 7vw, 6.6rem);
-            line-height: 0.92;
-            letter-spacing: -0.07em;
+            font-size: clamp(2rem, 5vw, 3rem);
+            line-height: 1.15;
+            margin-bottom: 24px;
         }
 
-        .hero-copy {
-            position: relative;
-            z-index: 1;
-            max-width: 640px;
-            margin-top: 26px;
-            color: var(--muted);
-            font-size: 1.05rem;
-            line-height: 1.85;
-        }
-
-        .method-panel {
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            gap: 24px;
-            border-radius: 34px;
-            padding: 32px;
-        }
-
-        .method-panel h2,
         section h2 {
             color: var(--navy);
-            font-family: "Playfair Display", serif;
-            font-size: 2rem;
-            letter-spacing: -0.04em;
-        }
-
-        .method-panel p {
-            margin-top: 8px;
-            color: var(--muted);
-            line-height: 1.7;
-        }
-
-        .method-tabs {
-            display: grid;
-            gap: 10px;
-        }
-
-        .method-tab {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 16px;
-            padding: 16px 18px;
-            border: 1px solid var(--line);
-            border-radius: 18px;
-            background: rgba(255, 255, 255, 0.68);
-            color: var(--muted);
-            text-decoration: none;
+            font-size: 1.45rem;
             font-weight: 800;
-        }
-
-        .method-tab.active {
-            border-color: rgba(201, 154, 58, 0.44);
-            background: linear-gradient(135deg, #17233f, #273a66);
-            color: #fffaf0;
-            box-shadow: 0 18px 44px rgba(23, 35, 63, 0.18);
         }
 
         form {
@@ -267,12 +160,6 @@
             margin-bottom: 18px;
         }
 
-        .section-note {
-            color: var(--muted);
-            font-size: 0.9rem;
-            font-weight: 700;
-        }
-
         .field {
             display: grid;
             gap: 10px;
@@ -282,8 +169,7 @@
             color: var(--muted);
             font-size: 0.78rem;
             font-weight: 800;
-            letter-spacing: 0.14em;
-            text-transform: uppercase;
+            letter-spacing: 0.04em;
         }
 
         .table-wrap {
@@ -310,8 +196,7 @@
             color: var(--muted);
             font-size: 0.72rem;
             font-weight: 800;
-            letter-spacing: 0.12em;
-            text-transform: uppercase;
+            letter-spacing: 0.04em;
             background: rgba(246, 239, 224, 0.62);
         }
 
@@ -403,10 +288,6 @@
             body {
                 padding: 20px;
             }
-
-            .hero {
-                grid-template-columns: 1fr;
-            }
         }
 
         @media (max-width: 640px) {
@@ -423,9 +304,11 @@
             }
 
             section,
-            .hero-panel,
-            .method-panel {
+            .page {
                 border-radius: 24px;
+            }
+
+            section {
                 padding: 22px;
             }
         }
@@ -433,19 +316,18 @@
 </head>
 
 <body>
-    {% macro transaction_section(title, note, table_id, id_heading, items, kind, add_label=None, add_note=None) %}
+    {% macro transaction_section(title, table_id, id_heading, items, kind, add_label=None) %}
     <section>
         <div class="section-header">
             <h2>{{ title }}</h2>
-            <span class="section-note">{{ note }}</span>
         </div>
         <div class="table-wrap">
             <table id="{{ table_id }}">
                 <thead>
                     <tr>
-                        <th>Name</th>
+                        <th>名称</th>
                         <th>{{ id_heading }}</th>
-                        <th>Amount</th>
+                        <th>金額</th>
                         <th></th>
                     </tr>
                 </thead>
@@ -460,7 +342,7 @@
                         <td><input type="text" name="expense_method[]" value="{{ item.method_id }}" readonly></td>
                         <td><input type="number" name="expense_amount[]" value="{{ item.amount }}"></td>
                         {% endif %}
-                        <td class="row-del" onclick="this.parentElement.remove()">x</td>
+                        <td class="row-del" onclick="this.parentElement.remove()">削除</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -468,7 +350,6 @@
         </div>
         {% if add_label %}
         <div class="button-row">
-            <span class="section-note">{{ add_note }}</span>
             <button type="button" onclick="addRow('{{ table_id }}', '{{ kind }}')">{{ add_label }}</button>
         </div>
         {% endif %}
@@ -478,17 +359,16 @@
     {% macro assets_section(items) %}
     <section>
         <div class="section-header">
-            <h2>Assets</h2>
-            <span class="section-note">Balances projected from the latest known snapshot.</span>
+            <h2>資産</h2>
         </div>
         <div class="table-wrap">
             <table id="asset-table">
                 <thead>
                     <tr>
-                        <th>Name</th>
-                        <th>Account ID</th>
-                        <th>Class</th>
-                        <th>Balance</th>
+                        <th>名称</th>
+                        <th>口座ID</th>
+                        <th>分類</th>
+                        <th>残高</th>
                         <th></th>
                     </tr>
                 </thead>
@@ -499,7 +379,7 @@
                         <td><input type="text" name="asset_account[]" value="{{ item.account_id }}" readonly></td>
                         <td><input type="text" name="asset_class[]" value="{{ item.asset_class }}" readonly></td>
                         <td><input type="number" name="asset_balance[]" value="{{ item.balance }}"></td>
-                        <td class="row-del" onclick="this.parentElement.remove()">x</td>
+                        <td class="row-del" onclick="this.parentElement.remove()">削除</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -509,93 +389,57 @@
     {% endmacro %}
 
     <main class="page">
-        <nav class="topbar" aria-label="Primary">
-            <a class="brand" href="/" aria-label="Back to dashboard">
+        <nav class="topbar" aria-label="メイン">
+            <a class="brand" href="/" aria-label="ダッシュボードへ戻る">
                 <span class="brand-mark" aria-hidden="true"></span>
-                BSPL Atelier
+                BSPL
             </a>
-            <a class="pill" href="/">Back to dashboard</a>
+            <a class="pill" href="/">ダッシュボード</a>
         </nav>
 
-        <section class="hero" aria-labelledby="input-title">
-            <div class="hero-panel">
-                <span class="eyebrow">Monthly ritual</span>
-                <h1 id="input-title">Make this month official.</h1>
-                <p class="hero-copy">
-                    Review the moving-average draft, refine the details, and save a
-                    clean monthly snapshot for your future self.
-                </p>
-            </div>
-
-            <aside class="method-panel" aria-labelledby="method-title">
-                <div>
-                    <h2 id="method-title">Auto-fill method</h2>
-                    <p>Choose the moving-average window used to prefill this form.</p>
-                </div>
-                <div class="method-tabs">
-                    <a href="/input?ma_months=6" class="method-tab {{ 'active' if ma_months == 6 else '' }}">
-                        <span>6 Months</span>
-                        <small>Default</small>
-                    </a>
-                    <a href="/input?ma_months=12" class="method-tab {{ 'active' if ma_months == 12 else '' }}">
-                        <span>1 Year</span>
-                        <small>Smoother</small>
-                    </a>
-                    <a href="/input?ma_months=60" class="method-tab {{ 'active' if ma_months == 60 else '' }}">
-                        <span>5 Years</span>
-                        <small>Long view</small>
-                    </a>
-                </div>
-            </aside>
-        </section>
+        <h1 id="input-title">月次入力</h1>
 
         <form method="POST" action="/input">
             <section>
                 <div class="section-header">
-                    <h2>Target Month</h2>
-                    <span class="section-note">The month this snapshot belongs to.</span>
+                    <h2>対象月</h2>
                 </div>
                 <div class="field">
-                    <label for="target_month">Month</label>
+                    <label for="target_month">年月</label>
                     <input id="target_month" type="month" name="target_month" value="{{ target_month }}" required>
                 </div>
             </section>
 
             {{ transaction_section(
-                "Income",
-                "Expected incoming cash for the month.",
+                "収入",
                 "income-table",
-                "Account ID",
+                "口座ID",
                 income_items,
                 "income",
-                "Add Income Row",
-                "Add a custom income source when needed."
+                "収入を追加"
             ) }}
 
             {{ transaction_section(
-                "Credit Cards",
-                "Settlement-based expenses from registered cards.",
+                "カード支払",
                 "card-table",
-                "Method ID",
+                "支払方法ID",
                 card_items,
                 "expense"
             ) }}
 
             {{ transaction_section(
-                "Other Expenses",
-                "Cash, transfers, and non-card spending.",
+                "その他支出",
                 "other-expense-table",
-                "Method ID",
+                "支払方法ID",
                 other_expense_items,
                 "expense",
-                "Add Expense Row",
-                "Add one-off or manual spending lines here."
+                "支出を追加"
             ) }}
 
             {{ assets_section(asset_items) }}
 
             <div class="actions">
-                <button class="save-button" type="submit">Save All Data</button>
+                <button class="save-button" type="submit">保存</button>
             </div>
         </form>
     </main>
@@ -607,17 +451,17 @@
 
             if (type === "income") {
                 newRow.innerHTML = `
-                    <td>Custom income</td>
-                    <td><input type="text" name="income_account[]" placeholder="Account ID"></td>
+                    <td>手入力</td>
+                    <td><input type="text" name="income_account[]" placeholder="口座ID"></td>
                     <td><input type="number" name="income_amount[]" value="0"></td>
-                    <td class="row-del" onclick="this.parentElement.remove()">x</td>
+                    <td class="row-del" onclick="this.parentElement.remove()">削除</td>
                 `;
             } else if (type === "expense") {
                 newRow.innerHTML = `
-                    <td>Custom expense</td>
-                    <td><input type="text" name="expense_method[]" placeholder="Method ID"></td>
+                    <td>手入力</td>
+                    <td><input type="text" name="expense_method[]" placeholder="支払方法ID"></td>
                     <td><input type="number" name="expense_amount[]" value="0"></td>
-                    <td class="row-del" onclick="this.parentElement.remove()">x</td>
+                    <td class="row-del" onclick="this.parentElement.remove()">削除</td>
                 `;
             }
 
