@@ -19,6 +19,7 @@ def create_app() -> Flask:
 
     root_dir = os.getcwd()
     graph_service = GraphService(data_dir=root_dir)
+    graph_service.warm_visible_cache()
 
     CREDIT_CARD_MIN_SETTLEMENT_DAY = 1
 
@@ -119,6 +120,9 @@ def create_app() -> Flask:
             print("Running Task: forecast...")
             subprocess.run(["task", "forecast"], check=True)
             
+            graph_service.clear_cache()
+            graph_service.warm_visible_cache()
+
             print("Recalculation complete.")
 
             return redirect(url_for("dashboard"))

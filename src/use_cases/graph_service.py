@@ -1,5 +1,5 @@
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional, cast
 
 from datetime import datetime
@@ -22,6 +22,59 @@ CHART_COLORS = {
 class GraphService:
 
     data_dir: str
+    _csv_cache: dict[str, tuple[float, pd.DataFrame]] = field(default_factory=dict)
+    _chart_cache: dict[tuple[str, Optional[int], Optional[int], float], str] = field(
+        default_factory=dict
+    )
+
+    def warm_visible_cache(self) -> None:
+        visible_ranges = (
+            {"months": 12, "forecast": None},
+            {"months": None, "forecast": None},
+            {"months": None, "forecast": 60},
+        )
+        chart_builders = (
+            self.get_net_worth_chart,
+            self.get_cashflow_chart,
+            self.get_allocation_chart,
+            self.get_ratios_chart,
+            self.get_returns_chart,
+            self.get_fi_chart,
+        )
+
+        for range_args in visible_ranges:
+            for build_chart in chart_builders:
+                build_chart(**range_args)
+
+    def clear_cache(self) -> None:
+        self._csv_cache.clear()
+        self._chart_cache.clear()
+
+    def _csv_path(self, filename: str) -> str:
+        return os.path.join(self.data_dir, "data", "calculated", filename)
+
+    def _data_version(self, filename: str) -> float:
+        return os.path.getmtime(self._csv_path(filename))
+
+    def _cache_key(
+        self, chart_name: str, months: Optional[int], forecast: Optional[int]
+    ) -> tuple[str, Optional[int], Optional[int], float]:
+        return (chart_name, months, forecast, self._data_version("forecast.csv"))
+
+    def _cached_chart(
+        self, chart_name: str, months: Optional[int], forecast: Optional[int]
+    ) -> str | None:
+        return self._chart_cache.get(self._cache_key(chart_name, months, forecast))
+
+    def _store_chart(
+        self,
+        chart_name: str,
+        months: Optional[int],
+        forecast: Optional[int],
+        html: str,
+    ) -> str:
+        self._chart_cache[self._cache_key(chart_name, months, forecast)] = html
+        return html
 
     def _to_html(self, fig: go.Figure) -> str:
         fig.update_layout(
@@ -73,8 +126,15 @@ class GraphService:
         )
 
     def _load_csv(self, filename: str) -> pd.DataFrame:
-        path = os.path.join(self.data_dir, "data", "calculated", filename)
-        return pd.read_csv(path)
+        path = self._csv_path(filename)
+        mtime = os.path.getmtime(path)
+        cached = self._csv_cache.get(filename)
+        if cached and cached[0] == mtime:
+            return cached[1]
+
+        df = pd.read_csv(path)
+        self._csv_cache[filename] = (mtime, df)
+        return df
 
     def _filter_data(
         self, df: pd.DataFrame, months: Optional[int], forecast: Optional[int]
@@ -95,6 +155,10 @@ class GraphService:
     def get_net_worth_chart(
         self, months: Optional[int] = None, forecast: Optional[int] = None
     ) -> str:
+        cached = self._cached_chart("net_worth", months, forecast)
+        if cached is not None:
+            return cached
+
         df = self._load_csv("forecast.csv")
         df = self._filter_data(df, months, forecast)
 
@@ -159,11 +223,15 @@ class GraphService:
             ),
         )
 
-        return self._to_html(fig)
+        return self._store_chart("net_worth", months, forecast, self._to_html(fig))
 
     def get_cashflow_chart(
         self, months: Optional[int] = None, forecast: Optional[int] = None
     ) -> str:
+        cached = self._cached_chart("cashflow", months, forecast)
+        if cached is not None:
+            return cached
+
         df = self._load_csv("forecast.csv")
         df = self._filter_data(df, months, forecast)
 
@@ -253,11 +321,15 @@ class GraphService:
             ),
         )
 
-        return self._to_html(fig)
+        return self._store_chart("cashflow", months, forecast, self._to_html(fig))
 
     def get_allocation_chart(
         self, months: Optional[int] = None, forecast: Optional[int] = None
     ) -> str:
+        cached = self._cached_chart("allocation", months, forecast)
+        if cached is not None:
+            return cached
+
         df = self._load_csv("forecast.csv")
         df = self._filter_data(df, months, forecast)
 
@@ -312,11 +384,15 @@ class GraphService:
             yaxis=dict(range=[0, 100]),
         )
 
-        return self._to_html(fig)
+        return self._store_chart("allocation", months, forecast, self._to_html(fig))
 
     def get_ratios_chart(
         self, months: Optional[int] = None, forecast: Optional[int] = None
     ) -> str:
+        cached = self._cached_chart("ratios", months, forecast)
+        if cached is not None:
+            return cached
+
         df = self._load_csv("forecast.csv")
         df = self._filter_data(df, months, forecast)
 
@@ -357,11 +433,15 @@ class GraphService:
             yaxis=dict(title="Ratio (%)"),
         )
 
-        return self._to_html(fig)
+        return self._store_chart("ratios", months, forecast, self._to_html(fig))
 
     def get_returns_chart(
         self, months: Optional[int] = None, forecast: Optional[int] = None
     ) -> str:
+        cached = self._cached_chart("returns", months, forecast)
+        if cached is not None:
+            return cached
+
         df = self._load_csv("forecast.csv")
         df = self._filter_data(df, months, forecast)
 
@@ -416,11 +496,15 @@ class GraphService:
             yaxis=dict(title="Return (%)"),
         )
 
-        return self._to_html(fig)
+        return self._store_chart("returns", months, forecast, self._to_html(fig))
 
     def get_fi_chart(
         self, months: Optional[int] = None, forecast: Optional[int] = None
     ) -> str:
+        cached = self._cached_chart("fi", months, forecast)
+        if cached is not None:
+            return cached
+
         df = self._load_csv("forecast.csv")
         df = self._filter_data(df, months, forecast)
 
@@ -495,4 +579,4 @@ class GraphService:
             ],
         )
 
-        return self._to_html(fig)
+        return self._store_chart("fi", months, forecast, self._to_html(fig))
