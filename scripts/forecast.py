@@ -40,6 +40,161 @@ def is_bonus_month(month: int) -> bool:
     return month in get_bonus_months()
 
 
+def load_accounts(base_dir: Path) -> pd.DataFrame:
+    return pd.read_csv(base_dir / "master" / "accounts.csv")
+
+
+def load_forecast_streams(base_dir: Path) -> pd.DataFrame:
+    required_cols = {
+        "stream_id",
+        "display_name",
+        "kind",
+        "source_account_ids",
+        "forecast_to_account_id",
+    }
+    streams = pd.read_csv(base_dir / "master" / "forecast_streams.csv").fillna("")
+    missing = required_cols - set(streams.columns)
+    if missing:
+        raise ValueError(f"forecast_streams.csv missing columns: {sorted(missing)}")
+    return streams
+
+
+def account_name_by_id(accounts: pd.DataFrame) -> dict[str, str]:
+    return dict(zip(accounts["account_id"], accounts["name"]))
+
+
+def income_col(account_id: str, account_names: dict[str, str]) -> str | None:
+    name = account_names.get(account_id)
+    return f"収入_{name}" if name else None
+
+
+def asset_col(account_id: str, account_names: dict[str, str]) -> str | None:
+    name = account_names.get(account_id)
+    return f"資産_{name}" if name else None
+
+
+def parse_account_ids(value: str) -> list[str]:
+    return [part.strip() for part in str(value).split(";") if part.strip()]
+
+
+def forecast_stream_amount(
+    history: pd.DataFrame,
+    stream: pd.Series,
+    account_names: dict[str, str],
+    future_months: list[str],
+    stats: list | None = None,
+) -> dict[str, float]:
+    source_cols = [
+        col
+        for account_id in parse_account_ids(stream["source_account_ids"])
+        if (col := income_col(account_id, account_names)) in history.columns
+    ]
+    stream_col = f"stream_{stream['stream_id']}"
+    stream_history = history[["month"]].copy()
+    stream_history[stream_col] = (
+        history[source_cols].sum(axis=1) if source_cols else 0.0
+    )
+
+    kind = stream["kind"]
+    if kind == "cash_income":
+        return forecast_salary_income(stream_history, stream_col, future_months, stats)
+    if kind == "drawdown":
+        return forecast_minna_income(stream_history, stream_col, future_months, stats)
+    if kind == "asset_contribution":
+        return forecast_fixed_income(stream_history, stream_col, future_months)
+    if kind == "transfer_like":
+        return forecast_other_income(stream_history, stream_col, future_months)
+
+    return forecast_other_income(stream_history, stream_col, future_months)
+
+
+def forecast_income_by_stream(
+    history: pd.DataFrame,
+    income_cols: list[str],
+    future_months: list[str],
+    accounts: pd.DataFrame,
+    streams: pd.DataFrame,
+    stats: list | None = None,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    account_names = account_name_by_id(accounts)
+    forecast_income = pd.DataFrame(0.0, index=future_months, columns=income_cols)
+    stream_amounts = pd.DataFrame(0.0, index=future_months, columns=streams["stream_id"])
+
+    for _, stream in streams.iterrows():
+        forecasts = forecast_stream_amount(
+            history, stream, account_names, future_months, stats
+        )
+        stream_id = stream["stream_id"]
+        stream_amounts[stream_id] = pd.Series(forecasts)
+
+        destination = income_col(stream["forecast_to_account_id"], account_names)
+        if destination in forecast_income.columns:
+            forecast_income[destination] += stream_amounts[stream_id]
+
+    forecast_income.index.name = "month"
+    stream_amounts.index.name = "month"
+    return forecast_income, stream_amounts
+
+
+def stream_kind_totals(stream_amounts: pd.DataFrame, streams: pd.DataFrame) -> dict[str, pd.Series]:
+    totals = {
+        "cash_income": pd.Series(0.0, index=stream_amounts.index),
+        "asset_contribution": pd.Series(0.0, index=stream_amounts.index),
+    }
+    for _, stream in streams.iterrows():
+        kind = stream["kind"]
+        if kind in totals and stream["stream_id"] in stream_amounts.columns:
+            totals[kind] = totals[kind] + stream_amounts[stream["stream_id"]]
+    return totals
+
+
+def classify_asset_columns(
+    asset_cols: list[str], accounts: pd.DataFrame
+) -> tuple[list[str], list[str], list[str]]:
+    account_names = account_name_by_id(accounts)
+    cash_accounts: list[str] = []
+    risk_accounts: list[str] = []
+    pension_accounts: list[str] = []
+
+    for _, account in accounts.iterrows():
+        col = asset_col(account["account_id"], account_names)
+        if col not in asset_cols:
+            continue
+
+        account_type = account["type"]
+        is_risk = int(account["risk"]) == 1
+        if account_type == "pension":
+            pension_accounts.append(col)
+        elif is_risk:
+            risk_accounts.append(col)
+        else:
+            cash_accounts.append(col)
+
+    return cash_accounts, risk_accounts, pension_accounts
+
+
+def contribution_columns_by_asset(
+    streams: pd.DataFrame, account_names: dict[str, str]
+) -> dict[str, str]:
+    result: dict[str, str] = {}
+    for _, stream in streams[streams["kind"] == "asset_contribution"].iterrows():
+        income = income_col(stream["forecast_to_account_id"], account_names)
+        asset = asset_col(stream["forecast_to_account_id"], account_names)
+        if income and asset:
+            result[asset] = income
+    return result
+
+
+def preferred_cash_asset_column(
+    streams: pd.DataFrame, account_names: dict[str, str], cash_accounts: list[str]
+) -> str | None:
+    for _, stream in streams[streams["kind"] == "cash_income"].iterrows():
+        destination = asset_col(stream["forecast_to_account_id"], account_names)
+        if destination in cash_accounts:
+            return destination
+    return cash_accounts[0] if cash_accounts else None
+
+
 def forecast_salary_income(
     history: pd.DataFrame, col: str, future_months: list[str], stats: list = None
 ) -> dict[str, float]:
@@ -290,14 +445,21 @@ def calculate_bs_derived(df: pd.DataFrame) -> pd.DataFrame:
         df["pension_assets"]
     )
     
-    # Investment Gain/Loss = Total(t) - Total(t-1) - Net Savings(t)
+    # Investment Gain/Loss = Total(t) - Total(t-1) - Net Worth Contribution(t)
     prev_total = df["total_financial_assets"].shift(1)
+    contribution_col = (
+        "net_worth_contribution"
+        if "net_worth_contribution" in df.columns
+        else "net_savings"
+    )
     
     # Note: Shift(1) for the first item will be NaN, so Gain will be NaN.
     # For history start, this is acceptable (or 0).
     # For forecast start, it seamlessly uses history's last value.
     
-    df["investment_gain_loss"] = df["total_financial_assets"] - prev_total - df["net_savings"]
+    df["investment_gain_loss"] = (
+        df["total_financial_assets"] - prev_total - df[contribution_col]
+    )
     
     # Fill NaN for first row if needed (usually 0 or leave as NaN)
     df.loc[df["investment_gain_loss"].isna(), "investment_gain_loss"] = 0.0
@@ -418,7 +580,19 @@ def export_annual_summary(df: pd.DataFrame, output_dir: Path) -> None:
     # 1. Flows (Sum)
     inc_cols = [c for c in df.columns if c.startswith("収入_")]
     exp_cols = [c for c in df.columns if c.startswith("支出_")]
-    flow_cols = inc_cols + exp_cols + ["after_tax_income", "expenditure", "net_savings", "investment_gain_loss"]
+    derived_flow_cols = [
+        "cash_income",
+        "asset_contribution",
+        "cash_savings",
+        "net_worth_contribution",
+        "after_tax_income",
+        "expenditure",
+        "net_savings",
+        "investment_gain_loss",
+    ]
+    flow_cols = inc_cols + exp_cols + [
+        c for c in derived_flow_cols if c in df.columns
+    ]
     
     # 2. Stocks (Last)
     cls_cols = [c for c in df.columns if c.startswith("分類_")]
@@ -490,7 +664,15 @@ def export_annual_summary(df: pd.DataFrame, output_dir: Path) -> None:
     ast_cols_sorted = sorted([c for c in annual.columns if c.startswith("資産_")])
     cls_cols_sorted = sorted([c for c in annual.columns if c.startswith("分類_")])
     
-    cashflow_cols = ["after_tax_income", "expenditure", "net_savings"]
+    cashflow_cols = [
+        "cash_income",
+        "asset_contribution",
+        "cash_savings",
+        "net_worth_contribution",
+        "after_tax_income",
+        "expenditure",
+        "net_savings",
+    ]
     bs_cols = ["liquid_assets", "risk_assets", "pension_assets", "total_financial_assets", "investment_gain_loss"]
     metric_cols = ["savings_rate", "risk_asset_ratio", "annual_return"]
     
@@ -520,6 +702,9 @@ def main() -> None:
     # Load historical data
     # We load normalized.csv which has History (including metrics)
     history = pd.read_csv(calculated_dir / "normalized.csv")
+    accounts = load_accounts(base_dir)
+    streams = load_forecast_streams(base_dir)
+    account_names = account_name_by_id(accounts)
     
     # Determine forecast period (next 30 years = 360 months)
     last_month = history["month"].max()
@@ -541,17 +726,12 @@ def main() -> None:
     class_cols = [c for c in history.columns if c.startswith("分類_")]
     asset_cols = [c for c in history.columns if c.startswith("資産_")]
     
-    # Forecast income
+    # Forecast income by metadata stream, then write back to concrete columns.
+    forecast_income, stream_amounts = forecast_income_by_stream(
+        history, income_cols, future_months, accounts, streams, stats
+    )
     for col in income_cols:
-        if "みんなの銀行" in col:
-            forecasts = forecast_minna_income(history, col, future_months, stats)
-        elif "厚生年金" in col or "確定拠出年金" in col:
-            forecasts = forecast_fixed_income(history, col, future_months)
-        elif any(x in col for x in ["ゆうちょ", "ソニー", "ドイツ"]):
-            forecasts = forecast_salary_income(history, col, future_months, stats)
-        else:
-            forecasts = forecast_other_income(history, col, future_months)
-        forecast[col] = forecast["month"].map(forecasts)
+        forecast[col] = forecast["month"].map(forecast_income[col])
     
     # Forecast expenses
     for col in expense_cols:
@@ -559,9 +739,18 @@ def main() -> None:
         forecast[col] = forecast["month"].map(forecasts)
     
     # Calculate cashflow (Raw values)
-    forecast["after_tax_income"] = forecast[income_cols].sum(axis=1) / 10000
+    kind_totals = stream_kind_totals(stream_amounts, streams)
+    forecast["cash_income"] = forecast["month"].map(kind_totals["cash_income"]) / 10000
+    forecast["asset_contribution"] = (
+        forecast["month"].map(kind_totals["asset_contribution"]) / 10000
+    )
     forecast["expenditure"] = forecast[expense_cols].sum(axis=1) / 10000
-    forecast["net_savings"] = forecast["after_tax_income"] - forecast["expenditure"]
+    forecast["cash_savings"] = forecast["cash_income"] - forecast["expenditure"]
+    forecast["net_worth_contribution"] = (
+        forecast["cash_savings"] + forecast["asset_contribution"]
+    )
+    forecast["after_tax_income"] = forecast["cash_income"]
+    forecast["net_savings"] = forecast["cash_savings"]
     
     # Forecast assets
     # Get last values
@@ -608,23 +797,34 @@ def main() -> None:
     prev_liquid = last_row.get("liquid_assets", 0)
     prev_risk = last_row.get("risk_assets", 0)
     prev_pension = last_row.get("pension_assets", 0)
+    cash_accounts, risk_accounts, pension_accounts = classify_asset_columns(
+        asset_cols, accounts
+    )
+    contribution_income_by_asset = contribution_columns_by_asset(streams, account_names)
+    target_cash_acc = preferred_cash_asset_column(
+        streams, account_names, cash_accounts
+    )
     
     for month_str in future_months:
-        net_savings = forecast.loc[forecast["month"] == month_str, "net_savings"].values[0]
+        cash_savings = forecast.loc[
+            forecast["month"] == month_str, "cash_savings"
+        ].values[0]
+        net_worth_contribution = forecast.loc[
+            forecast["month"] == month_str, "net_worth_contribution"
+        ].values[0]
         
         # Calculate Pension Contribution (Flow into Pension Assets)
-        pension_contrib = (
-            forecast.loc[forecast["month"] == month_str, "収入_厚生年金"].values[0] +
-            forecast.loc[forecast["month"] == month_str, "収入_確定拠出年金"].values[0]
-        ) / 10000
+        pension_contrib = forecast.loc[
+            forecast["month"] == month_str, "asset_contribution"
+        ].values[0]
         
         # Update Pension Assets (Contributions Only - Simplified)
         # (Pension is conservative, usually treated separately or fixed growth, here just contribs)
         new_pension = prev_pension + pension_contrib
         forecast.loc[forecast["month"] == month_str, "pension_assets"] = new_pension
         
-        # Determine Liquid Flow (Net Savings - Pension)
-        liquid_flow = net_savings - pension_contrib
+        # Determine Liquid Flow (cash savings only; pension/DC is not spendable cash)
+        liquid_flow = cash_savings
         
         # Logic: 
         # 1. Bank assets don't grow (Flat)
@@ -665,10 +865,10 @@ def main() -> None:
         forecast.loc[forecast["month"] == month_str, "total_financial_assets"] = total
         
         # Investment gain/loss
-        # Gain = Total - Prev - Savings
+        # Gain = Total - Prev - Net Worth Contribution
         # Gain ≈ Risk Growth
         prev_total = prev_liquid + prev_risk + prev_pension
-        gain_loss = total - prev_total - net_savings
+        gain_loss = total - prev_total - net_worth_contribution
         forecast.loc[forecast["month"] == month_str, "investment_gain_loss"] = gain_loss
         
         # --- Update Class Columns ---
@@ -696,31 +896,21 @@ def main() -> None:
             prev_class_values[col] = new_val
 
         # --- Update Asset Columns ---
-        cash_accounts = [c for c in asset_cols if any(x in c for x in ["ゆうちょ", "ソニー", "WISE", "みんな", "城南", "ドイツ", "現金"])]
-        risk_accounts = [c for c in asset_cols if any(x in c for x in ["SBI証券", "楽天証券", "マネックス", "Binance"])]
-        pension_accounts = [c for c in asset_cols if any(x in c for x in ["厚生年金", "確定拠出年金"])]
-        
-        # Determine targets
         current_risk_balances = {c: prev_asset_values.get(c, 0) for c in risk_accounts}
         if current_risk_balances:
             target_risk_acc = max(current_risk_balances, key=current_risk_balances.get)
         else:
-            target_risk_acc = next((c for c in risk_accounts if "SBI" in c), risk_accounts[0] if risk_accounts else None)
-
-        current_cash_balances = {c: prev_asset_values.get(c, 0) for c in cash_accounts}
-        if current_cash_balances:
-            target_cash_acc = max(current_cash_balances, key=current_cash_balances.get)
-        else:
-            target_cash_acc = "資産_現金"
+            target_risk_acc = risk_accounts[0] if risk_accounts else None
         
         for col in asset_cols:
             new_val = prev_asset_values[col]
             
             if col in pension_accounts:
-                if "厚生年金" in col:
-                    new_val += forecast.loc[forecast["month"] == month_str, "収入_厚生年金"].values[0]
-                elif "確定拠出年金" in col:
-                    new_val += forecast.loc[forecast["month"] == month_str, "収入_確定拠出年金"].values[0]
+                contribution_col = contribution_income_by_asset.get(col)
+                if contribution_col in forecast.columns:
+                    new_val += forecast.loc[
+                        forecast["month"] == month_str, contribution_col
+                    ].values[0]
             
             elif col in risk_accounts:
                 # Apply Growth to ALL risk accounts
@@ -748,6 +938,15 @@ def main() -> None:
     # --- METRICS CALCULATION (Using Unified Vectorized Logic) ---
     # 1. Combine History and Forecast (Raw values)
     # We append forecast to history
+    if "cash_income" not in history.columns:
+        history["cash_income"] = history["after_tax_income"]
+    if "asset_contribution" not in history.columns:
+        history["asset_contribution"] = 0.0
+    if "cash_savings" not in history.columns:
+        history["cash_savings"] = history["net_savings"]
+    if "net_worth_contribution" not in history.columns:
+        history["net_worth_contribution"] = history["net_savings"]
+
     combined = pd.concat([history, forecast], ignore_index=True)
     
     # 2. Calculate Derived Balance Sheet Items (Total, Gain/Loss)
@@ -798,7 +997,15 @@ def main() -> None:
     class_cols = sorted([c for c in combined.columns if c.startswith("分類_")])
     asset_cols = sorted([c for c in combined.columns if c.startswith("資産_")])
     
-    cashflow_cols = ["after_tax_income", "expenditure", "net_savings"]
+    cashflow_cols = [
+        "cash_income",
+        "asset_contribution",
+        "cash_savings",
+        "net_worth_contribution",
+        "after_tax_income",
+        "expenditure",
+        "net_savings",
+    ]
     bs_cols = ["liquid_assets", "risk_assets", "pension_assets", "total_financial_assets", "investment_gain_loss"]
     metric_cols = ["savings_rate", "risk_asset_ratio", "monthly_return", "monthly_alpha", 
                    "benchmark_return", "fi_ratio_12m", "fi_ratio_48m", "fi_ratio_next_12m"]

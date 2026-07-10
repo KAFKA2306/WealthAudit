@@ -56,8 +56,6 @@ class BalanceSheetCalculator:
 
                 jpy_balance = asset.balance * rate
 
-                jpy_balance = asset.balance * rate
-
                 if acc.type == AccountType.PENSION:
                     pension_total += jpy_balance
                 elif acc.risk == 1:
@@ -67,15 +65,15 @@ class BalanceSheetCalculator:
 
             total_assets = liquid_total + risk_total + pension_total
 
-            total_assets = liquid_total + risk_total + pension_total
-
             cf = cf_map.get(month)
-            net_savings = cf.net_savings if cf else 0.0
+            net_worth_contribution = cf.net_worth_contribution if cf else 0.0
 
             if not bs_list:
                 investment_gain = 0.0
             else:
-                investment_gain = total_assets - (prev_total_assets + net_savings)
+                investment_gain = (
+                    total_assets - prev_total_assets - net_worth_contribution
+                )
 
             bs_list.append(
                 BalanceSheet(

@@ -3,6 +3,10 @@
 from typing import Any
 import os
 import datetime
+import shutil
+import subprocess
+import tempfile
+from pathlib import Path
 import pandas as pd
 from dateutil.relativedelta import relativedelta  # type: ignore
 from flask import Flask, render_template, request, redirect, url_for, Response
@@ -18,19 +22,112 @@ def create_app() -> Flask:
     )
 
     root_dir = os.getcwd()
+    input_dir = Path(root_dir) / "data" / "input"
+    calculated_dir = Path(root_dir) / "data" / "calculated"
     graph_service = GraphService(data_dir=root_dir)
-    graph_service.warm_visible_cache()
 
     CREDIT_CARD_MIN_SETTLEMENT_DAY = 1
 
+    def warm_graph_cache() -> None:
+        try:
+            graph_service.warm_visible_cache()
+        except Exception as exc:
+            app.logger.info("Skipping graph cache warmup: %s", exc)
+
+    warm_graph_cache()
+
     def get_data_path(filename: str) -> str:
-        return os.path.join(root_dir, "data", "input", filename)
+        return str(input_dir / filename)
 
     def load_csv(filename: str) -> pd.DataFrame:
         path = get_data_path(filename)
         if not os.path.exists(path):
             return pd.DataFrame()
         return pd.read_csv(path)
+
+    def replace_month(
+        filename: str,
+        target_month: str | None,
+        rows: list[dict[str, Any]],
+        columns: list[str],
+    ) -> pd.DataFrame | None:
+        if not rows:
+            return None
+
+        df = load_csv(filename)
+        new_df = pd.DataFrame(rows, columns=columns)
+        if df.empty:
+            df = pd.DataFrame(columns=columns)
+        else:
+            df = df[df["month"] != target_month]
+        return pd.concat([df, new_df], ignore_index=True)
+
+    def write_staged_inputs(
+        updates: dict[str, pd.DataFrame], temp_root: Path
+    ) -> Path | None:
+        if not updates:
+            return None
+
+        staged_input_dir = temp_root / "input"
+        if input_dir.exists():
+            shutil.copytree(input_dir, staged_input_dir)
+        else:
+            staged_input_dir.mkdir(parents=True)
+
+        for filename, df in updates.items():
+            df.to_csv(staged_input_dir / filename, index=False)
+
+        return staged_input_dir
+
+    def snapshot_calculated(temp_root: Path) -> Path | None:
+        if not calculated_dir.exists():
+            return None
+        snapshot_dir = temp_root / "calculated"
+        shutil.copytree(calculated_dir, snapshot_dir)
+        return snapshot_dir
+
+    def restore_calculated(snapshot_dir: Path | None) -> None:
+        if calculated_dir.exists():
+            shutil.rmtree(calculated_dir)
+        if snapshot_dir is not None:
+            shutil.copytree(snapshot_dir, calculated_dir)
+
+    def apply_staged_inputs(
+        staged_input_dir: Path | None, temp_root: Path
+    ) -> Path | None:
+        if staged_input_dir is None:
+            return None
+
+        backup_input_dir = temp_root / "input.original"
+        input_dir.parent.mkdir(parents=True, exist_ok=True)
+        if input_dir.exists():
+            input_dir.rename(backup_input_dir)
+        staged_input_dir.rename(input_dir)
+        return backup_input_dir
+
+    def restore_inputs(backup_input_dir: Path | None) -> None:
+        if backup_input_dir is None:
+            return
+
+        if input_dir.exists():
+            shutil.rmtree(input_dir)
+        backup_input_dir.rename(input_dir)
+
+    def discard_backup_inputs(backup_input_dir: Path | None) -> None:
+        if backup_input_dir is not None and backup_input_dir.exists():
+            shutil.rmtree(backup_input_dir)
+
+    def run_recalculation() -> None:
+        print("Triggering recalculation...")
+
+        print("Running Task: run...")
+        subprocess.run(["task", "run"], check=True)
+
+        print("Running Task: export...")
+        subprocess.run(["task", "export"], check=True)
+
+        print("Running Task: forecast...")
+        subprocess.run(["task", "forecast"], check=True)
 
     @app.route("/")
     def dashboard() -> str:
@@ -76,52 +173,53 @@ def create_app() -> Flask:
                         }
                     )
 
-            if new_income:
-                df = load_csv("income.csv")
-                new_df = pd.DataFrame(new_income)
-                if df.empty:
-                    df = pd.DataFrame(columns=["month", "account_id", "amount"])
-                else:
-                    df = df[df["month"] != target_month]
-                pd.concat([df, new_df]).to_csv(get_data_path("income.csv"), index=False)
+            updates = {
+                filename: df
+                for filename, df in {
+                    "income.csv": replace_month(
+                        "income.csv",
+                        target_month,
+                        new_income,
+                        ["month", "account_id", "amount"],
+                    ),
+                    "expense.csv": replace_month(
+                        "expense.csv",
+                        target_month,
+                        new_expenses,
+                        ["month", "method_id", "amount"],
+                    ),
+                    "assets.csv": replace_month(
+                        "assets.csv",
+                        target_month,
+                        new_assets,
+                        ["month", "account_id", "asset_class", "balance"],
+                    ),
+                }.items()
+                if df is not None
+            }
 
-            if new_expenses:
-                df = load_csv("expense.csv")
-                new_df = pd.DataFrame(new_expenses)
-                if df.empty:
-                    df = pd.DataFrame(columns=["month", "method_id", "amount"])
-                else:
-                    df = df[df["month"] != target_month]
-                pd.concat([df, new_df]).to_csv(
-                    get_data_path("expense.csv"), index=False
-                )
+            with tempfile.TemporaryDirectory(prefix="wealthaudit-input-") as temp_name:
+                temp_root = Path(temp_name)
+                staged_input_dir = write_staged_inputs(updates, temp_root)
+                calculated_snapshot = snapshot_calculated(temp_root)
+                backup_input_dir = apply_staged_inputs(staged_input_dir, temp_root)
 
-            if new_assets:
-                df = load_csv("assets.csv")
-                new_df = pd.DataFrame(new_assets)
-                if df.empty:
-                    df = pd.DataFrame(
-                        columns=["month", "account_id", "asset_class", "balance"]
+                try:
+                    run_recalculation()
+                except subprocess.CalledProcessError as exc:
+                    restore_inputs(backup_input_dir)
+                    restore_calculated(calculated_snapshot)
+                    graph_service.clear_cache()
+                    return (
+                        "Recalculation failed. Input CSV files were restored; "
+                        f"failed command: {' '.join(exc.cmd)}",
+                        500,
                     )
                 else:
-                    df = df[df["month"] != target_month]
-                pd.concat([df, new_df]).to_csv(get_data_path("assets.csv"), index=False)
+                    discard_backup_inputs(backup_input_dir)
 
-            import subprocess
-
-            print("Triggering recalculation...")
-            
-            print("Running Task: run...")
-            subprocess.run(["task", "run"], check=True)
-
-            print("Running Task: export...")
-            subprocess.run(["task", "export"], check=True)
-
-            print("Running Task: forecast...")
-            subprocess.run(["task", "forecast"], check=True)
-            
             graph_service.clear_cache()
-            graph_service.warm_visible_cache()
+            warm_graph_cache()
 
             print("Recalculation complete.")
 
@@ -129,7 +227,7 @@ def create_app() -> Flask:
 
         else:
             prefill_months = 6
-            
+
             income_df = load_csv("income.csv")
             expense_df = load_csv("expense.csv")
             asset_df = load_csv("assets.csv")
@@ -303,7 +401,9 @@ def create_app() -> Flask:
         Add headers to both force latest IE rendering engine or Chrome Frame,
         and also to cache the rendered page for 10 minutes.
         """
-        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, post-check=0, pre-check=0, max-age=0"
+        response.headers["Cache-Control"] = (
+            "no-store, no-cache, must-revalidate, post-check=0, pre-check=0, max-age=0"
+        )
         response.headers["Pragma"] = "no-cache"
         response.headers["Expires"] = "-1"
         return response

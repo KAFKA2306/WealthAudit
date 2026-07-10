@@ -34,7 +34,7 @@ def main() -> None:
     accounts = master_repo.get_accounts()
 
     print("Calculating Cash Flow...")
-    cf_statements = cf_calculator.calculate(incomes, expenses)
+    cf_statements = cf_calculator.calculate(incomes, expenses, accounts)
 
     print("Calculating Balance Sheet...")
     bs_statements = bs_calculator.calculate(assets, markets, accounts, cf_statements)
@@ -53,6 +53,8 @@ def main() -> None:
                 "after_tax_income": cf.after_tax_income / 10000,
                 "expenditure": cf.expenditure / 10000,
                 "net_savings": cf.net_savings / 10000,
+                "asset_contribution": cf.asset_contribution / 10000,
+                "net_worth_contribution": cf.net_worth_contribution / 10000,
             }
         )
     pd.DataFrame(cf_data).to_csv(

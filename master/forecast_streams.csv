@@ -1,0 +1,9 @@
+stream_id,display_name,kind,source_account_ids,forecast_to_account_id
+main_salary,主給与,cash_income,sony;rakuten,rakuten
+yucho_cash_income,ゆうちょ銀行収入,cash_income,yucho,yucho
+deutsche_cash_income,ドイツ銀行収入,cash_income,deutsche,deutsche
+jonan_cash_income,城南信用金庫収入,cash_income,jonan,jonan
+minna_drawdown,みんなの銀行取り崩し,drawdown,minna,minna
+wise_transfer,WISE移動,transfer_like,wise,wise
+kosei_nenkin_contrib,厚生年金拠出,asset_contribution,kosei_nenkin,kosei_nenkin
+dc_contrib,確定拠出年金拠出,asset_contribution,dc,dc

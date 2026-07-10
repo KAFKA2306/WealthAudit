@@ -53,3 +53,21 @@ tasks:
     cmds:
       - uv run python scripts/forecast.py
 
+  drive:import:
+    desc: Import local Drive-synced input.xlsx into data/input/*.csv
+    cmds:
+      - uv run python scripts/sync_drive.py import {{.CLI_ARGS}}
+
+  drive:export:
+    desc: Export data/calculated/*.csv into local Drive-synced view.xlsx
+    cmds:
+      - uv run python scripts/sync_drive.py export {{.CLI_ARGS}}
+
+  sync-drive:
+    desc: Import input.xlsx, run calculations, and export view.xlsx
+    cmds:
+      - task drive:import -- {{.CLI_ARGS}}
+      - task run
+      - task export
+      - task forecast
+      - task drive:export -- {{.CLI_ARGS}}

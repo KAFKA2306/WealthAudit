@@ -2,12 +2,34 @@ from dataclasses import dataclass
 from src.domain.entities.models import Month
 
 
-@dataclass
+@dataclass(init=False)
 class CashFlowStatement:
     month: Month
     after_tax_income: int
     expenditure: int
     net_savings: int
+    asset_contribution: int = 0
+    net_worth_contribution: int
+
+    def __init__(
+        self,
+        month: Month,
+        after_tax_income: int,
+        expenditure: int,
+        net_savings: int,
+        asset_contribution: int = 0,
+        net_worth_contribution: int | None = None,
+    ) -> None:
+        self.month = month
+        self.after_tax_income = after_tax_income
+        self.expenditure = expenditure
+        self.net_savings = net_savings
+        self.asset_contribution = asset_contribution
+        self.net_worth_contribution = (
+            net_savings + asset_contribution
+            if net_worth_contribution is None
+            else net_worth_contribution
+        )
 
 
 @dataclass
