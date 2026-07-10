@@ -6,6 +6,7 @@ from src.domain.entities.models import (
     Asset,
     Market,
     Account,
+    AssetClass,
     PaymentMethod,
 )
 from src.constants import (
@@ -97,6 +98,17 @@ class CsvMasterRepository(IMasterRepository):
                 type=AccountType(row["type"]),
                 currency=Currency(row["currency"]),
                 risk=int(row["risk"]),
+            )
+            for _, row in df.iterrows()
+        ]
+
+    def get_asset_classes(self) -> List[AssetClass]:
+        df = pd.read_csv(f"{self.data_dir}/master/asset_classes.csv")
+        return [
+            AssetClass(
+                id=AssetClassId(row["class_id"]),
+                name=row["name"],
+                risk_level=int(row["risk_level"]),
             )
             for _, row in df.iterrows()
         ]

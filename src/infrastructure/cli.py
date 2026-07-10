@@ -32,12 +32,15 @@ def main() -> None:
     assets = asset_repo.get_assets()
     markets = market_repo.get_market_data()
     accounts = master_repo.get_accounts()
+    asset_classes = master_repo.get_asset_classes()
 
     print("Calculating Cash Flow...")
     cf_statements = cf_calculator.calculate(incomes, expenses, accounts)
 
     print("Calculating Balance Sheet...")
-    bs_statements = bs_calculator.calculate(assets, markets, accounts, cf_statements)
+    bs_statements = bs_calculator.calculate(
+        assets, markets, accounts, cf_statements, asset_classes
+    )
 
     print("Calculating Metrics...")
     metrics = metrics_calculator.calculate(cf_statements, bs_statements, markets)

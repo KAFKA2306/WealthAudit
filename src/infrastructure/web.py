@@ -269,7 +269,7 @@ def create_app() -> Flask:
                         if not acc_row.empty:
                             name = acc_row.iloc[0]["name"]
                     income_items.append(
-                        {"account_id": acc, "name": name, "amount": avg}
+                        {"account_id": acc, "name": name, "suggested_amount": avg}
                     )
 
             card_items = []
@@ -294,7 +294,7 @@ def create_app() -> Flask:
                     met_data = recent_exp[recent_exp["method_id"] == met]
                     avg = int(met_data["amount"].mean()) if not met_data.empty else 0
 
-                    item = {"method_id": met, "name": name, "amount": avg}
+                    item = {"method_id": met, "name": name, "suggested_amount": avg}
 
                     if settlement_day >= CREDIT_CARD_MIN_SETTLEMENT_DAY:
                         card_items.append(item)
@@ -340,7 +340,7 @@ def create_app() -> Flask:
                             "account_id": acc,
                             "name": name,
                             "asset_class": cls,
-                            "balance": extrapolated,
+                            "suggested_balance": extrapolated,
                         }
                     )
 

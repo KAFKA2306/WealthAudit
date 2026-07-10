@@ -52,6 +52,13 @@ class Account:
 
 
 @dataclass(frozen=True)
+class AssetClass:
+    id: AssetClassId
+    name: str
+    risk_level: int
+
+
+@dataclass(frozen=True)
 class PaymentMethod:
     id: PaymentMethodId
     name: str

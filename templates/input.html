@@ -337,10 +337,10 @@
                         <td>{{ item.name }}</td>
                         {% if kind == "income" %}
                         <td><input type="text" name="income_account[]" value="{{ item.account_id }}" readonly></td>
-                        <td><input type="number" name="income_amount[]" value="{{ item.amount }}"></td>
+                        <td><input type="number" name="income_amount[]" value="" placeholder="目安: {{ item.suggested_amount }}"></td>
                         {% else %}
                         <td><input type="text" name="expense_method[]" value="{{ item.method_id }}" readonly></td>
-                        <td><input type="number" name="expense_amount[]" value="{{ item.amount }}"></td>
+                        <td><input type="number" name="expense_amount[]" value="" placeholder="目安: {{ item.suggested_amount }}"></td>
                         {% endif %}
                         <td class="row-del" onclick="this.parentElement.remove()">削除</td>
                     </tr>
@@ -378,7 +378,7 @@
                         <td>{{ item.name }}</td>
                         <td><input type="text" name="asset_account[]" value="{{ item.account_id }}" readonly></td>
                         <td><input type="text" name="asset_class[]" value="{{ item.asset_class }}" readonly></td>
-                        <td><input type="number" name="asset_balance[]" value="{{ item.balance }}"></td>
+                        <td><input type="number" name="asset_balance[]" value="" placeholder="目安: {{ item.suggested_balance }}"></td>
                         <td class="row-del" onclick="this.parentElement.remove()">削除</td>
                     </tr>
                     {% endfor %}
@@ -453,14 +453,14 @@
                 newRow.innerHTML = `
                     <td>手入力</td>
                     <td><input type="text" name="income_account[]" placeholder="口座ID"></td>
-                    <td><input type="number" name="income_amount[]" value="0"></td>
+                    <td><input type="number" name="income_amount[]" placeholder="金額"></td>
                     <td class="row-del" onclick="this.parentElement.remove()">削除</td>
                 `;
             } else if (type === "expense") {
                 newRow.innerHTML = `
                     <td>手入力</td>
                     <td><input type="text" name="expense_method[]" placeholder="支払方法ID"></td>
-                    <td><input type="number" name="expense_amount[]" value="0"></td>
+                    <td><input type="number" name="expense_amount[]" placeholder="金額"></td>
                     <td class="row-del" onclick="this.parentElement.remove()">削除</td>
                 `;
             }

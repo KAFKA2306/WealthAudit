@@ -109,12 +109,15 @@ Negative:
 
 ## Implementation Notes
 
-Add these tasks later:
+The local Drive boundary is operated through these tasks:
 
 - import `input.xlsx` into `data/input/*.csv`
 - export `data/calculated/forecast.csv` or summary data into `view.xlsx`
 - detect or configure the Drive sync directory
 - add a single `task sync-drive` command
+- verify local readiness with `task drive:doctor`
+- snapshot operational files with `task drive:backup`
+- restore from an explicit backup with `task drive:restore -- --backup-dir <path>`
 - keep the Flask server local-only
 
-The first implementation should prefer boring file conversion over any API integration.
+The implementation should prefer boring local file conversion over any API integration.

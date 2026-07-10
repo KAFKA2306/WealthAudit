@@ -63,6 +63,21 @@ tasks:
     cmds:
       - uv run python scripts/sync_drive.py export {{.CLI_ARGS}}
 
+  drive:doctor:
+    desc: Verify local Drive/XLSX sync readiness
+    cmds:
+      - uv run python scripts/sync_drive.py doctor {{.CLI_ARGS}}
+
+  drive:backup:
+    desc: Snapshot local Drive/XLSX operational files
+    cmds:
+      - uv run python scripts/sync_drive.py backup {{.CLI_ARGS}}
+
+  drive:restore:
+    desc: Restore local Drive/XLSX operational files from an explicit backup
+    cmds:
+      - uv run python scripts/sync_drive.py restore {{.CLI_ARGS}}
+
   sync-drive:
     desc: Import input.xlsx, run calculations, and export view.xlsx
     cmds:

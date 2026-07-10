@@ -6,6 +6,7 @@ from src.domain.entities.models import (
     Asset,
     Market,
     Account,
+    AssetClass,
     PaymentMethod,
 )
 
@@ -35,6 +36,10 @@ class IMarketRepository(ABC):
 class IMasterRepository(ABC):
     @abstractmethod
     def get_accounts(self) -> List[Account]:
+        pass
+
+    @abstractmethod
+    def get_asset_classes(self) -> List[AssetClass]:
         pass
 
     @abstractmethod

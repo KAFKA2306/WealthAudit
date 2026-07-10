@@ -1,216 +1,67 @@
 # Forecast Logic
 
-将来月のカラム値を予測するロジック。すべてのパラメータはハードコードせず、過去データから統計的に推定する。
+## Inputs
 
-## 原則
+- `data/calculated/normalized.csv`
+- `master/accounts.csv`
+- `master/forecast_streams.csv`
+- `src/constants.py`
 
-1. **設定ファイル不要**: すべてのパラメータは過去データから自動推定
-2. **データ駆動**: 統計的手法（平均、中央値、変動係数）で分類・予測
-3. **前年同月参照**: 季節性は前年同月値を直接使用（係数計算なし）
+Concrete output columns remain: `収入_*`, `支出_*`, `資産_*`, `分類_*`.
 
-## 前提条件
+Forecast classification comes from `master/forecast_streams.csv`: `cash_income`, `asset_contribution`, `drawdown`, `transfer_like`, `other`.
 
-### データ要件
-- 最低12ヶ月以上の履歴データが必要
-- 前年同月参照のため、理想的には24ヶ月以上を推奨
+## Formulas
 
-### ドメイン前提
-| 項目 | 前提 |
-|------|------|
-| 賞与月 | 6月・12月固定 |
-| 給与 | 年次で単調増加（昇給） |
-| みんなの銀行 | 単調減少（取り崩し） |
-| 厚生年金・DC | 固定額 |
-| 投資リターン | 過去実績の幾何平均を継続 |
+```text
+cash_income(t) =
+  sum(stream_amount(t) where kind = cash_income)
 
-### 予測期間
-- **現在年月（実行時）から30年先まで**（360ヶ月）
-- 開始月は `datetime.now()` により動的に決定（ハードコードなし）
-- FI（経済的自立）シミュレーション向け
-- 過去実績（`normalized.csv`）と予測を結合した状態で出力
+asset_contribution(t) =
+  sum(stream_amount(t) where kind = asset_contribution)
 
-### データ形式と端数処理
+expenditure(t) =
+  sum(支出_*)
 
-| カラムカテゴリ | 対象例 | 単位 | 端数処理 |
-|----------------|--------|------|----------|
-| **金額（円）** | `収入_*`, `支出_*`, `分類_*`, `資産_*` | 円 (JPY) | **1000円単位**に丸め |
-| **資産残高（万円）** | `liquid_assets`, `risk_assets`, `pension_assets` | **万円** (Man-yen) | **有効数字4桁** |
-| **指標（比率）** | `savings_rate`, `risk_asset_ratio` 等 | 比率 (Rate) | **有効数字4桁** |
+cash_savings(t) =
+  cash_income(t) - expenditure(t)
 
-> Note: `assets.csv` 等の入力データが万円単位で管理されているため、集計カラムも万円単位となります。これらは有効数字4桁で端数処理します。
-
-## 収入予測 (`収入_*`)
-
-### 給与口座（ゆうちょ、ソニー等）
-
-**アクティブ口座検出**: 直近6ヶ月で収入がある口座のみ予測
-```
-if 直近6ヶ月合計 == 0:
-    予測値 = 0  # 使用されていない口座
+net_worth_contribution(t) =
+  cash_savings(t) + asset_contribution(t)
 ```
 
-**賞与月**: 6月・12月固定
+```text
+after_tax_income = cash_income
+net_savings = cash_savings
 
-**通常月予測** (1-5月、7-11月):
-```
-# 直近データと昇給を考慮
-年次成長率 = (今年の通常月平均 / 前年の通常月平均) - 1
-regular_base = 直近12ヶ月の通常月中央値（0除く）
-予測値 = regular_base × (1 + 年次成長率)
-```
+liquid_assets =
+  分類_現金・預金 / 10000
 
-**賞与月予測** (6月、12月):
-```
-bonus_avg = 直近2回の同月賞与平均（0除く）
-予測値 = bonus_avg × (1 + 年次成長率)
-```
+risk_assets =
+  risk asset classes / 10000
 
-### みんなの銀行
+pension_assets =
+  分類_年金 / 10000
 
-**単調減少ロジック**: 残額の取り崩しを想定
-```
-減少率 = mean(過去の月次減少率)
-予測値 = max(0, 前月値 × (1 - 減少率))
-# 残高が0になったら収入も0
+total_financial_assets =
+  liquid_assets + risk_assets + pension_assets
+
+investment_gain_loss(t) =
+  total_financial_assets(t)
+  - total_financial_assets(t-1)
+  - net_worth_contribution(t)
 ```
 
-### 固定収入（厚生年金、DC）
+## Outputs
 
-**固定判定**: 変動係数 CV < 0.1
-```
-予測値 = 直近値
-```
+- Forecast starts after the latest month in `normalized.csv`.
+- Forecast horizon is 360 months.
+- Metrics are recalculated after historical and forecast rows are combined.
 
-### その他収入
+| Value | Meaning |
+|-------|---------|
+| `60` | +5 years |
+| `120` | +10 years |
+| `360` | +30 years |
 
-```
-予測値 = mean(過去3ヶ月)  # 0の場合は0
-```
-
-## 支出予測 (`支出_*`)
-
-### 固定/変動の自動分類
-
-変動係数（CV = 標準偏差 / 平均）で判定:
-- CV < 0.3 → **固定費**: 直近12ヶ月平均
-- CV ≥ 0.3 → **変動費**: トレンド調整法
-
-### トレンド調整法（変動費）
-
-```
-trend_ratio = 直近3ヶ月平均 / 前年同期3ヶ月平均
-予測値 = 12ヶ月前の値 × trend_ratio
-```
-
-**例:**
-- 12ヶ月前の支出 = 100,000円
-- 直近3ヶ月平均 = 80,000円
-- 前年同期3ヶ月平均 = 100,000円
-- → trend_ratio = 0.8
-- → 予測値 = 100,000 × 0.8 = **80,000円**
-
-**メリット**: 季節性を維持しつつ、構造的な支出変化（生活費削減など）を反映
-
-### 調整項目
-
-```
-予測値 = mean(過去12ヶ月)  # 通常は固定値（例: -150,000）
-```
-
-## 資産予測 (`資産_*`, `分類_*`)
-
-### 現金・預金 (`liquid_assets`)
-
-**ロジック**:
-- `liquid_flow = net_savings - pension_contributions`
-- `liquid_flow < 0` (赤字) の場合: **現金・預金から取り崩し**
-- `liquid_flow > 0` (黒字) の場合: **現金・預金は成長させない**（維持）
-
-```
-if liquid_flow < 0:
-    予測残高 = 前月残高 + liquid_flow
-else:
-    予測残高 = 前月残高
-```
-
-### リスク資産 (`risk_assets`)
-
-**ロジック**:
-- `liquid_flow > 0` (黒字) の場合: **全額をリスク資産に追加**（投資）
-- **市場リターンで複利成長する**: 評価額は過去の実績幾何平均リターンで成長
-- `new_balance = prev_balance * (1 + geo_return) + investment_flow`
-
-```
-リスク成長 = 前月残高 × geometric_mean_return
-if liquid_flow > 0:
-    予測残高 = 前月残高 + リスク成長 + liquid_flow
-else:
-    予測残高 = 前月残高 + リスク成長
-```
-
-### 年金 (`pension_assets`)
-
-**ロジック**:
-- 拠出額を毎月加算
-- 市場リターン予測は行わない
-
-```
-予測残高 = 前月残高 + 予測拠出額
-```
-
-## キャッシュフロー（派生値）
-
-```
-after_tax_income = Σ(収入_*)
-expenditure = Σ(支出_*)
-net_savings = after_tax_income - expenditure
-```
-
-## バランスシート（派生値）
-
-```
-liquid_assets = 分類_現金・預金 / 10000
-risk_assets = (分類_投資信託 + 分類_株式 + ...) / 10000
-pension_assets = 分類_年金 / 10000
-total_financial_assets = liquid_assets + risk_assets + pension_assets
-investment_gain_loss = total_t - total_{t-1} - net_savings
-```
-
-## Metrics（派生値）
- 
- `docs/logics/metrics.md` のロジックを使用し、**実績データと予測データを結合した後に**一括で計算します。
- 
- - 個別の予測モデルは作成せず、結合された時系列データに対して統一された計算式（移動平均など）を適用します。
- - これにより、実績期間と予測期間の境界でも一貫した指標値（貯蓄率のTTM等）が算出されます。
-
-## 統計関数
-
-| 関数 | 説明 |
-|------|------|
-| `median(x, n)` | 過去n期間の中央値 |
-| `mean(x, n)` | 過去n期間の平均 |
-| `std(x, n)` | 過去n期間の標準偏差 |
-| `cv(x, n)` | 変動係数 = std / mean |
-| `geometric_mean(r, n)` | 幾何平均リターン |
-
-## Dashboard表示
-
-### 予測データのトグル表示
-
-ダッシュボードでは、将来予測データの表示/非表示を切り替えることができます。
-
-```html
-<!-- 履歴のみ -->
-<button hx-get="/graphs/net-worth">All</button>
-
-<!-- 将来5年予測を追加表示 -->
-<button hx-get="/graphs/net-worth?forecast=60">+5Y</button>
-```
-
-| パラメータ | 値 | 説明 |
-|-----------|-----|------|
-| `forecast` | 60 | 5年分（60ヶ月）の予測を表示 |
-| `forecast` | 120 | 10年分（120ヶ月）の予測を表示 |
-| `forecast` | 360 | 30年分（全予測）を表示 |
-
-詳細は [htmx/graph.md](../htmx/graph.md#6-forecast-toggle-feature) 参照。
+See [htmx/graph.md](../htmx/graph.md#6-forecast-toggle-feature).

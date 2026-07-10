@@ -1,21 +1,16 @@
 # 家計財務諸表 データスキーマ
 
-## 概要
-正規化されたデータ構造の定義。
-
----
-
 ## ディレクトリ構成
 
-```
+```text
 .
 ├── data/
-│   ├── input/           # 手入力データ（ユーザー責任）
+│   ├── input/
 │   │   ├── income.csv
 │   │   ├── expense.csv
 │   │   ├── assets.csv
 │   │   └── market.csv
-│   └── calculated/      # 自動計算（システム責任）
+│   └── calculated/
 │       ├── cashflow.csv
 │       ├── balance_sheet.csv
 │       ├── metrics.csv
@@ -23,74 +18,24 @@
 │       ├── forecast.csv
 │       ├── forecast_annual.csv
 │       └── forecast_parameters.csv
-├── master/              # マスタデータ
+├── master/
 │   ├── accounts.csv
 │   ├── asset_classes.csv
+│   ├── forecast_streams.csv
 │   └── payment_methods.csv
 ```
 
----
+## ID Sources
 
-## 型定義 (TypeScript Like)
+- `src/constants.py`
+- `master/accounts.csv`
+- `master/asset_classes.csv`
+- `master/forecast_streams.csv`
+- `master/payment_methods.csv`
+
+## Data Models
 
 ```typescript
-// Enums from src/constants.py
-
-enum AccountId {
-    YUCHO = 'yucho',
-    SONY = 'sony',
-    DEUTSCHE = 'deutsche',
-    MINNA = 'minna',
-    JONAN = 'jonan',
-    WISE = 'wise',
-    SBI_SEC = 'sbi_sec',
-    RAKUTEN_SEC = 'rakuten_sec',
-    MONEX_SEC = 'monex_sec',
-    BINANCE = 'binance',
-    KOSEI_NENKIN = 'kosei_nenkin',
-    DC = 'dc',
-}
-
-enum AssetClassId {
-    CASH = 'cash',
-    STOCK_JP = 'stock_jp',
-    STOCK_US = 'stock_us',
-    FUND = 'fund',
-    FX = 'fx',
-    CRYPTO = 'crypto',
-    PENSION = 'pension',
-    VC = 'vc',
-}
-
-enum PaymentMethodId {
-    SMBC_1 = 'smbc_1',
-    SMBC_2 = 'smbc_2',
-    RAKUTEN_1 = 'rakuten_1',
-    RAKUTEN_2 = 'rakuten_2',
-    EPOS = 'epos',
-    MONEX_CARD = 'monex_card',
-    SONY_CARD = 'sony_card',
-    WISE = 'wise',
-    CASH = 'cash',
-    ADJUSTMENT = 'adjustment',
-}
-
-enum AccountType {
-    BANK = 'bank',
-    SECURITIES = 'securities',
-    CRYPTO = 'crypto',
-    PENSION = 'pension',
-}
-
-enum Currency {
-    JPY = 'JPY',
-    USD = 'USD',
-    EUR = 'EUR',
-    MULTI = 'multi',
-}
-
-// Data Models from src/domain/entities/models.py
-
 type Month = string; // YYYY-MM
 
 interface Income {
@@ -102,14 +47,14 @@ interface Income {
 interface Expense {
   month: Month;
   method_id: PaymentMethodId;
-  amount: number; // JPY (Negative for adjustments)
+  amount: number; // JPY
 }
 
 interface Asset {
   month: Month;
   account_id: AccountId;
   asset_class: AssetClassId;
-  balance: number; // Original Currency
+  balance: number; // original currency
 }
 
 interface Market {
@@ -130,25 +75,13 @@ interface Account {
 interface PaymentMethod {
   id: PaymentMethodId;
   name: string;
-  settlement_account?: AccountId; // Link to Account
+  settlement_account?: AccountId;
 }
 ```
 
----
-
 ## 計算ロジック依存関係
 
-1. **基礎集計** (`data/input/*` → `calculated/cashflow`, `calculated/balance_sheet`)
-   - 収入: `input/income.csv` を月次・口座別に集計
-   - 支出: `input/expense.csv` を月次・集計
-   - 資産: `input/assets.csv` × `input/market.csv` (為替) で円換算
-
-2. **指標計算** (`calculated/*` → `calculated/metrics`)
-   - 貯蓄率、リスク性資産比率などのKPI導出
-
----
-
-## 注意事項
-
-- **調整項目 (`adjustment`)**: 支出のマイナスとして計上し、純粋な支出額を補正するために使用する。
-- **引落口座**: クレジットカードの支払いは `master/payment_methods.csv` の `settlement_account` で定義された口座から資金移動が発生するものとみなす（CF上の支出はカード利用月基準）。
+1. `data/input/*` → `data/calculated/cashflow.csv`, `data/calculated/balance_sheet.csv`
+2. `data/calculated/*` → `data/calculated/metrics.csv`
+3. `data/calculated/*` → `data/calculated/normalized.csv`
+4. `normalized.csv` + `master/forecast_streams.csv` → `forecast.csv`
