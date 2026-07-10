@@ -8,7 +8,7 @@ class CashFlowStatement:
     after_tax_income: int
     expenditure: int
     net_savings: int
-    asset_contribution: int = 0
+    asset_contribution: int
     net_worth_contribution: int
 
     def __init__(

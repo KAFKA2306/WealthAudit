@@ -1,5 +1,5 @@
 from bisect import bisect_right
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Sequence
 from collections import defaultdict
 from src.domain.entities.models import Asset, Market, Account, AssetClass, Month
 from src.constants import AccountId, AccountType, AssetClassId, Currency
@@ -102,7 +102,7 @@ class BalanceSheetCalculator:
         self,
         month: str,
         market_cache: List[Market],
-        market_months: List[str],
+        market_months: Sequence[str],
     ) -> Optional[Market]:
         if not market_cache:
             return None
@@ -119,7 +119,7 @@ class BalanceSheetCalculator:
         market: Optional[Market],
         has_market_data: bool,
     ) -> float:
-        if account.currency == Currency.JPY:
+        if account.currency in (Currency.JPY, Currency.MULTI):
             return 1.0
 
         if not has_market_data or market is None:

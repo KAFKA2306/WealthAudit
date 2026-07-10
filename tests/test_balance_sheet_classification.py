@@ -84,6 +84,33 @@ def test_balance_sheet_uses_cached_market_for_missing_months() -> None:
     assert [bs.liquid_assets for bs in result] == [1500, 1500, 1700]
 
 
+def test_balance_sheet_treats_multi_currency_snapshots_as_jpy() -> None:
+    result = BalanceSheetCalculator().calculate(
+        assets=[
+            Asset(Month("2026-06"), AccountId.BINANCE, AssetClassId.CRYPTO, 300_000),
+            Asset(Month("2026-06"), AccountId.WISE, AssetClassId.CASH, 1_000_000),
+        ],
+        markets=[],
+        accounts=[
+            _account(
+                AccountId.BINANCE,
+                AccountType.CRYPTO,
+                Currency.MULTI,
+                risk=1,
+            ),
+            _account(AccountId.WISE, AccountType.FINTECH, Currency.MULTI),
+        ],
+        cashflows=[],
+        asset_classes=[
+            _asset_class(AssetClassId.CRYPTO, risk_level=1),
+        ],
+    )
+
+    assert result[0].risk_assets == 300_000
+    assert result[0].liquid_assets == 1_000_000
+    assert result[0].total_financial_assets == 1_300_000
+
+
 def test_balance_sheet_raises_for_foreign_currency_without_market_data() -> None:
     with pytest.raises(ValueError, match="Market data is required to convert USD asset"):
         BalanceSheetCalculator().calculate(

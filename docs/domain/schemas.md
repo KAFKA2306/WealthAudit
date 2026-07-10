@@ -54,7 +54,7 @@ interface Asset {
   month: Month;
   account_id: AccountId;
   asset_class: AssetClassId;
-  balance: number; // original currency
+  balance: number; // account currency units; consolidated JPY valuation for multi accounts
 }
 
 interface Market {
@@ -68,7 +68,7 @@ interface Account {
   id: AccountId;
   name: string;
   type: AccountType;
-  currency: Currency;
+  currency: Currency; // JPY, USD, EUR, or multi
   risk: number; // 0 or 1
 }
 

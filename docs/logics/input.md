@@ -24,7 +24,7 @@ Contains asset balance data.
 - `month`: The month of the asset balance snapshot (YYYY-MM).
 - `account_id`: The ID of the account holding the asset.
 - `asset_class`: The asset class of the asset.
-- `balance`: The balance of the asset in its original currency.
+- `balance`: The asset balance in the account currency. For accounts whose master currency is `multi`, this is the consolidated JPY valuation.
 
 ### `market.csv`
 Contains market data for currency exchange rates and stock indices.
@@ -42,7 +42,7 @@ Contains master data for accounts.
 - `account_id`: The unique ID of the account.
 - `name`: The name of the account.
 - `type`: The type of the account (e.g., `bank`, `securities`).
-- `currency`: The currency of the account (e.g., `JPY`, `USD`).
+- `currency`: The currency of the account (`JPY`, `USD`, `EUR`, or `multi`).
 - `risk`: A flag indicating if the account holds risk assets (1 for true, 0 for false).
 
 ### `asset_classes.csv`
