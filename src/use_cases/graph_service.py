@@ -150,13 +150,44 @@ class GraphService:
     ) -> str:
         def build(df: pd.DataFrame) -> go.Figure:
             figure = go.Figure()
-            figure.add_bar(x=df["month"], y=df["after_tax_income"], name="Income", marker_color=CHART_COLORS["sage"])
-            figure.add_bar(x=df["month"], y=-df["expenditure"], name="Expenses", marker_color=CHART_COLORS["rose"])
-            figure.add_bar(x=df["month"], y=df["investment_gain_loss"], name="Investment G/L", marker_color=CHART_COLORS["gold"])
+            figure.add_bar(
+                x=df["month"],
+                y=df["after_tax_income"],
+                name="Income",
+                marker_color=CHART_COLORS["sage"],
+            )
+            figure.add_bar(
+                x=df["month"],
+                y=-df["expenditure"],
+                name="Expenses",
+                marker_color=CHART_COLORS["rose"],
+            )
+            figure.add_bar(
+                x=df["month"],
+                y=df["investment_gain_loss"],
+                name="Investment G/L",
+                marker_color=CHART_COLORS["gold"],
+            )
             flow = total_wealth_flow(df)
-            figure.add_scatter(x=df["month"], y=flow, name="Total Wealth Flow", mode="lines+markers", line=dict(color=CHART_COLORS["navy"], width=3))
-            figure.add_scatter(x=df["month"], y=flow.rolling(12, min_periods=1).mean(), name="Total Wealth Flow (12MA)", mode="lines", line=dict(color=CHART_COLORS["gold"], width=3, dash="dash"))
-            figure.update_layout(title="Monthly Cash Flow (万円)", barmode="relative", yaxis_title="Amount (万円)")
+            figure.add_scatter(
+                x=df["month"],
+                y=flow,
+                name="Total Wealth Flow",
+                mode="lines+markers",
+                line=dict(color=CHART_COLORS["navy"], width=3),
+            )
+            figure.add_scatter(
+                x=df["month"],
+                y=flow.rolling(12, min_periods=1).mean(),
+                name="Total Wealth Flow (12MA)",
+                mode="lines",
+                line=dict(color=CHART_COLORS["gold"], width=3, dash="dash"),
+            )
+            figure.update_layout(
+                title="Monthly Cash Flow (万円)",
+                barmode="relative",
+                yaxis_title="Amount (万円)",
+            )
             return figure
 
         return self._cached("cashflow", months, forecast, build)
@@ -173,8 +204,17 @@ class GraphService:
                 ("risk_assets", "Risk Assets", CHART_COLORS["gold"]),
                 ("pension_assets", "Pension Assets", CHART_COLORS["sage"]),
             ):
-                figure.add_bar(x=df["month"], y=df[column] / denominator * 100, name=name, marker_color=color)
-            figure.update_layout(title="Asset Allocation (%)", barmode="stack", yaxis=dict(title="Ratio (%)", range=[0, 100]))
+                figure.add_bar(
+                    x=df["month"],
+                    y=df[column] / denominator * 100,
+                    name=name,
+                    marker_color=color,
+                )
+            figure.update_layout(
+                title="Asset Allocation (%)",
+                barmode="stack",
+                yaxis=dict(title="Ratio (%)", range=[0, 100]),
+            )
             return figure
 
         return self._cached("allocation", months, forecast, build)
@@ -184,8 +224,20 @@ class GraphService:
     ) -> str:
         def build(df: pd.DataFrame) -> go.Figure:
             figure = go.Figure()
-            figure.add_scatter(x=df["month"], y=df["savings_rate"] * 100, name="Savings Rate (%)", mode="lines+markers", line=dict(color=CHART_COLORS["navy"], width=3))
-            figure.add_scatter(x=df["month"], y=df["risk_asset_ratio"] * 100, name="Invested Asset Ratio (%)", mode="lines+markers", line=dict(color=CHART_COLORS["gold"], width=3))
+            figure.add_scatter(
+                x=df["month"],
+                y=df["savings_rate"] * 100,
+                name="Savings Rate (%)",
+                mode="lines+markers",
+                line=dict(color=CHART_COLORS["navy"], width=3),
+            )
+            figure.add_scatter(
+                x=df["month"],
+                y=df["risk_asset_ratio"] * 100,
+                name="Invested Asset Ratio (%)",
+                mode="lines+markers",
+                line=dict(color=CHART_COLORS["gold"], width=3),
+            )
             figure.update_layout(title="Financial Ratios (%)", yaxis_title="Ratio (%)")
             return figure
 
@@ -201,8 +253,16 @@ class GraphService:
                 ("benchmark_return", "Benchmark Return (%)", CHART_COLORS["slate"], "dot"),
                 ("monthly_alpha", "Alpha (%)", CHART_COLORS["gold"], None),
             ):
-                figure.add_scatter(x=df["month"], y=df[column] * 100, name=name, mode="lines+markers", line=dict(color=color, width=3, dash=dash))
-            figure.update_layout(title="Investment Performance (%)", yaxis_title="Return (%)")
+                figure.add_scatter(
+                    x=df["month"],
+                    y=df[column] * 100,
+                    name=name,
+                    mode="lines+markers",
+                    line=dict(color=color, width=3, dash=dash),
+                )
+            figure.update_layout(
+                title="Investment Performance (%)", yaxis_title="Return (%)"
+            )
             return figure
 
         return self._cached("returns", months, forecast, build)
@@ -217,8 +277,16 @@ class GraphService:
                 ("fi_ratio_48m", "FI Ratio (48m)", CHART_COLORS["sage"], None),
                 ("fi_ratio_next_12m", "FI Ratio (Projected)", CHART_COLORS["gold"], "dot"),
             ):
-                figure.add_scatter(x=df["month"], y=df[column], name=name, mode="lines+markers", line=dict(color=color, width=3, dash=dash))
-            figure.update_layout(title="Financial Independence Ratio", yaxis_title="Ratio (x Expenses)")
+                figure.add_scatter(
+                    x=df["month"],
+                    y=df[column],
+                    name=name,
+                    mode="lines+markers",
+                    line=dict(color=color, width=3, dash=dash),
+                )
+            figure.update_layout(
+                title="Financial Independence Ratio", yaxis_title="Ratio (x Expenses)"
+            )
             return figure
 
         return self._cached("fi", months, forecast, build)
