@@ -2,7 +2,6 @@ import os
 from dataclasses import dataclass, field
 from typing import Optional, cast
 
-from datetime import datetime
 import pandas as pd
 import plotly.graph_objects as go
 
@@ -136,21 +135,26 @@ class GraphService:
         self._csv_cache[filename] = (mtime, df)
         return df
 
+    def _latest_completed_period(self) -> pd.Period:
+        current = pd.Timestamp.now()
+        current_period = current.to_period("M")
+        if current.is_month_end:
+            return current_period
+        return current_period - 1
+
     def _filter_data(
         self, df: pd.DataFrame, months: Optional[int], forecast: Optional[int]
     ) -> pd.DataFrame:
-        current = datetime.now().strftime("%Y-%m")
-        if forecast:
-            start = (pd.to_datetime(current) - pd.DateOffset(months=12)).strftime(
-                "%Y-%m"
-            )
-            end = (pd.to_datetime(current) + pd.DateOffset(months=forecast)).strftime(
-                "%Y-%m"
-            )
-            return df[(df["month"] >= start) & (df["month"] <= end)]
+        month_periods = pd.to_datetime(df["month"]).dt.to_period("M")
+        current_period = pd.Timestamp.now().to_period("M")
+        if forecast is not None:
+            start = current_period - 12
+            end = current_period + forecast
+            return df[(month_periods >= start) & (month_periods <= end)]
+        cutoff_period = self._latest_completed_period()
         if months:
-            return df[df["month"] <= current].tail(months)
-        return df[df["month"] <= current]
+            return df[month_periods <= cutoff_period].tail(months)
+        return df[month_periods <= cutoff_period]
 
     def get_net_worth_chart(
         self, months: Optional[int] = None, forecast: Optional[int] = None
@@ -280,7 +284,9 @@ class GraphService:
             )
         )
 
-        total_flow = df["net_savings"] + df["investment_gain_loss"]
+        total_flow = (
+            df["net_savings"] + df["asset_contribution"] + df["investment_gain_loss"]
+        )
         total_flow_12ma = total_flow.rolling(window=12, min_periods=1).mean()
 
         fig.add_trace(

@@ -12,6 +12,7 @@ Columns are expanded based on master CSV patterns.
 
 import pandas as pd
 from pathlib import Path
+from src.utils.months import month_end_label
 
 
 def main() -> None:
@@ -37,6 +38,9 @@ def main() -> None:
     assets = pd.read_csv(input_dir / "assets.csv")
     income = pd.read_csv(input_dir / "income.csv")
     expense = pd.read_csv(input_dir / "expense.csv")
+    assets["month"] = assets["month"].apply(month_end_label)
+    income["month"] = income["month"].apply(month_end_label)
+    expense["month"] = expense["month"].apply(month_end_label)
 
     # Pivot assets by account_id (balance per account)
     assets_by_account = assets.pivot_table(
@@ -106,6 +110,9 @@ def main() -> None:
     balance_sheet = pd.read_csv(calculated_dir / "balance_sheet.csv")
     cashflow = pd.read_csv(calculated_dir / "cashflow.csv")
     metrics = pd.read_csv(calculated_dir / "metrics.csv")
+    balance_sheet["month"] = balance_sheet["month"].apply(month_end_label)
+    cashflow["month"] = cashflow["month"].apply(month_end_label)
+    metrics["month"] = metrics["month"].apply(month_end_label)
 
     # Join all tables on 'month' column
     # Order: P/L (income → expense) → B/S (class → account) → calculated metrics

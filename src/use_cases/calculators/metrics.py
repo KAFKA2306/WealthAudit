@@ -1,8 +1,8 @@
-from datetime import datetime
 from typing import List, Optional, Tuple
 from src.constants import EXPECTED_ANNUAL_RETURN
 from src.domain.entities.models import Market, Month
 from src.use_cases.dtos.output import BalanceSheet, CashFlowStatement, FinancialMetrics
+from src.utils.months import month_end_label, month_period
 
 
 class MetricsCalculator:
@@ -12,9 +12,9 @@ class MetricsCalculator:
         bs_statements: List[BalanceSheet],
         markets: List[Market],
     ) -> List[FinancialMetrics]:
-        cf_map = {cf.month: cf for cf in cf_statements}
-        bs_map = {bs.month: bs for bs in bs_statements}
-        market_map = {m.month: m for m in markets}
+        cf_map = {month_end_label(cf.month): cf for cf in cf_statements}
+        bs_map = {month_end_label(bs.month): bs for bs in bs_statements}
+        market_map = {month_end_label(m.month): m for m in markets}
 
         months = sorted(
             list(set(cf_map.keys()) | set(bs_map.keys()) | set(market_map.keys()))
@@ -23,9 +23,7 @@ class MetricsCalculator:
         def get_past_n_months_sums(
             current_month_str: str, n: int
         ) -> Tuple[int, int, int, int]:
-            curr_date = datetime.strptime(current_month_str, "%Y-%m")
-            curr_y = curr_date.year
-            curr_m = curr_date.month
+            curr_period = month_period(current_month_str)
 
             total_gain = 0
             total_expense = 0
@@ -33,11 +31,7 @@ class MetricsCalculator:
             total_savings = 0
 
             for i in range(n):
-                month_idx = curr_y * 12 + (curr_m - 1) - i
-                y = month_idx // 12
-                m = (month_idx % 12) + 1
-
-                m_str = f"{y:04d}-{m:02d}"
+                m_str = month_end_label((curr_period - i).strftime("%Y-%m"))
 
                 bs_item = bs_map.get(Month(m_str))
                 cf_item = cf_map.get(Month(m_str))
@@ -141,7 +135,7 @@ class MetricsCalculator:
 
             metrics_list.append(
                 FinancialMetrics(
-                    month=Month(month),
+                    month=Month(month_end_label(month)),
                     savings_rate=savings_rate,
                     risk_asset_ratio=risk_ratio,
                     monthly_return=geo_monthly_return,

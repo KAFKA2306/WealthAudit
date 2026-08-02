@@ -8,10 +8,10 @@ import subprocess
 import tempfile
 from pathlib import Path
 import pandas as pd
-from dateutil.relativedelta import relativedelta  # type: ignore
 from flask import Flask, render_template, request, redirect, url_for, Response
 
 from src.use_cases.graph_service import GraphService
+from src.utils.months import month_end_label, month_period, next_month_end_label
 
 
 def create_app() -> Flask:
@@ -59,7 +59,9 @@ def create_app() -> Flask:
         if df.empty:
             df = pd.DataFrame(columns=columns)
         else:
-            df = df[df["month"] != target_month]
+            target_period = month_period(target_month) if target_month else None
+            if target_period is not None:
+                df = df[pd.to_datetime(df["month"]).dt.to_period("M") != target_period]
         return pd.concat([df, new_df], ignore_index=True)
 
     def write_staged_inputs(
@@ -233,13 +235,12 @@ def create_app() -> Flask:
             asset_df = load_csv("assets.csv")
 
             if income_df.empty:
-                target_month = datetime.datetime.now().strftime("%Y-%m")
+                target_month = month_end_label(datetime.datetime.now().strftime("%Y-%m-%d"))
             else:
                 last_month_str = (
                     income_df["month"].iloc[-1] or income_df["month"].iloc[-2]
                 )
-                last_date = datetime.datetime.strptime(last_month_str, "%Y-%m")
-                target_month = (last_date + relativedelta(months=1)).strftime("%Y-%m")
+                target_month = next_month_end_label(last_month_str)
 
             months_list = (
                 sorted(income_df["month"].unique())[-prefill_months:]

@@ -77,9 +77,9 @@ def test_balance_sheet_uses_cached_market_for_missing_months() -> None:
     )
 
     assert [bs.month for bs in result] == [
-        Month("2026-01"),
-        Month("2026-03"),
-        Month("2026-05"),
+        Month("2026-01-31"),
+        Month("2026-03-31"),
+        Month("2026-05-31"),
     ]
     assert [bs.liquid_assets for bs in result] == [1500, 1500, 1700]
 

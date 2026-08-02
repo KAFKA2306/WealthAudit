@@ -3,6 +3,7 @@ from collections import defaultdict
 from src.constants import AccountType
 from src.domain.entities.models import Account, Income, Expense
 from src.use_cases.dtos.output import CashFlowStatement
+from src.utils.months import month_end_label
 
 
 class CashFlowCalculator:
@@ -37,8 +38,9 @@ class CashFlowCalculator:
             asset_contribution = monthly_asset_contribution[month]
             exp_val = monthly_expense[month]
             net_savings = inc_val - exp_val
+            month_label = month_end_label(month)
             statement = CashFlowStatement(
-                month=month,
+                month=month_label,
                 after_tax_income=inc_val,
                 expenditure=exp_val,
                 net_savings=net_savings,

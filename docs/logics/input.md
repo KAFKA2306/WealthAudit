@@ -7,21 +7,21 @@ This document describes the format of the input CSV files.
 ### `income.csv`
 Contains income data.
 
-- `month`: The month of the income (YYYY-MM).
+- `month`: The month-end date of the income (YYYY-MM-DD).
 - `account_id`: The ID of the account that received the income.
 - `amount`: The amount of income in JPY.
 
 ### `expense.csv`
 Contains expense data.
 
-- `month`: The month of the expense (YYYY-MM).
+- `month`: The month-end date of the expense (YYYY-MM-DD).
 - `method_id`: The ID of the payment method used for the expense.
 - `amount`: The amount of the expense in JPY. Negative values are treated as adjustments or refunds.
 
 ### `assets.csv`
 Contains asset balance data.
 
-- `month`: The month of the asset balance snapshot (YYYY-MM).
+- `month`: The month-end date of the asset balance snapshot (YYYY-MM-DD).
 - `account_id`: The ID of the account holding the asset.
 - `asset_class`: The asset class of the asset.
 - `balance`: The asset balance in the account currency. For accounts whose master currency is `multi`, this is the consolidated JPY valuation.
@@ -29,7 +29,7 @@ Contains asset balance data.
 ### `market.csv`
 Contains market data for currency exchange rates and stock indices.
 
-- `month`: The month of the market data (YYYY-MM).
+- `month`: The month-end date of the market data (YYYY-MM-DD).
 - `usd_jpy`: The USD/JPY exchange rate.
 - `eur_jpy`: The EUR/JPY exchange rate.
 - `sp500`: The S&P 500 index value.

@@ -8,9 +8,8 @@ Generates data/calculated/forecast.csv with predicted values.
 import numpy as np
 import pandas as pd
 from pathlib import Path
-from datetime import datetime
-from dateutil.relativedelta import relativedelta
 from src.constants import EXPECTED_ANNUAL_RETURN, FIXED_EXPENSE_CV_THRESHOLD
+from src.utils.months import month_end_label, month_period
 
 
 def calculate_cv(series: pd.Series) -> float:
@@ -447,11 +446,18 @@ def calculate_bs_derived(df: pd.DataFrame) -> pd.DataFrame:
     
     # Investment Gain/Loss = Total(t) - Total(t-1) - Net Worth Contribution(t)
     prev_total = df["total_financial_assets"].shift(1)
-    contribution_col = (
-        "net_worth_contribution"
-        if "net_worth_contribution" in df.columns
-        else "net_savings"
-    )
+    if "net_worth_contribution" in df.columns:
+        contribution_col = "net_worth_contribution"
+    elif "cash_savings" in df.columns and "asset_contribution" in df.columns:
+        df["_derived_net_worth_contribution"] = (
+            df["cash_savings"] + df["asset_contribution"]
+        )
+        contribution_col = "_derived_net_worth_contribution"
+    elif "asset_contribution" in df.columns:
+        df["_derived_net_worth_contribution"] = df["net_savings"] + df["asset_contribution"]
+        contribution_col = "_derived_net_worth_contribution"
+    else:
+        contribution_col = "cash_savings" if "cash_savings" in df.columns else "net_savings"
     
     # Note: Shift(1) for the first item will be NaN, so Gain will be NaN.
     # For history start, this is acceptable (or 0).
@@ -463,6 +469,8 @@ def calculate_bs_derived(df: pd.DataFrame) -> pd.DataFrame:
     
     # Fill NaN for first row if needed (usually 0 or leave as NaN)
     df.loc[df["investment_gain_loss"].isna(), "investment_gain_loss"] = 0.0
+    if "_derived_net_worth_contribution" in df.columns:
+        df = df.drop(columns=["_derived_net_worth_contribution"])
     
     return df
 
@@ -561,7 +569,7 @@ def calculate_metrics_vectorized(df: pd.DataFrame, geo_return_rate: float) -> pd
 
 
 def get_calendar_year(month_str: str) -> int:
-    """Get calendar year from 'YYYY-MM' string."""
+    """Get calendar year from a month-end label."""
     return int(month_str.split("-")[0])
 
 
@@ -573,8 +581,14 @@ def export_annual_summary(df: pd.DataFrame, output_dir: Path) -> None:
     Stocks: Last value
     Metrics: Recalculated
     """
-    df = df.copy()
+    df = df.copy().sort_values("month").reset_index(drop=True)
     df["year"] = df["month"].apply(get_calendar_year)
+    prev_risk_assets = df["risk_assets"].shift(1)
+    df["raw_monthly_return"] = 0.0
+    raw_mask = prev_risk_assets > 0
+    df.loc[raw_mask, "raw_monthly_return"] = (
+        df.loc[raw_mask, "investment_gain_loss"] / prev_risk_assets[raw_mask]
+    )
     
     # Define aggregation rules
     # 1. Flows (Sum)
@@ -621,18 +635,16 @@ def export_annual_summary(df: pd.DataFrame, output_dir: Path) -> None:
         annual.loc[mask, "risk_assets"] + annual.loc[mask, "pension_assets"]
     ) / annual.loc[mask, "total_financial_assets"]
     
-    # Annual Return (Approximate or TTM style from monthly?)
-    # Simple approach: Sum(Gain) / Start(Risk) -> but risk fluctuates.
-    # Better: Geometric linking of monthly returns.
-    # We need to process grouping to get geo mean of returns.
-    
-    def calc_annual_geo_return(group):
-        if "monthly_return" not in group.columns:
+    # Annual return should compound the raw month-to-month returns.
+    # `monthly_return` in this project is already a trailing-12m geometric
+    # average, so reusing it here would double-smooth the result.
+    def calc_annual_geo_return(raw_returns: pd.Series) -> float:
+        raw_returns = raw_returns.dropna()
+        if raw_returns.empty:
             return 0.0
-        # (1+r1)*(1+r2)... - 1
-        return np.prod(1 + group["monthly_return"]) - 1
-        
-    annual_returns = grouped.apply(calc_annual_geo_return)
+        return float(np.prod(1 + raw_returns) - 1)
+
+    annual_returns = grouped["raw_monthly_return"].apply(calc_annual_geo_return)
     annual["annual_return"] = annual_returns
     
     # Reset index to make 'year' a column
@@ -702,15 +714,16 @@ def main() -> None:
     # Load historical data
     # We load normalized.csv which has History (including metrics)
     history = pd.read_csv(calculated_dir / "normalized.csv")
+    history["month"] = history["month"].apply(month_end_label)
     accounts = load_accounts(base_dir)
     streams = load_forecast_streams(base_dir)
     account_names = account_name_by_id(accounts)
     
     # Determine forecast period (next 30 years = 360 months)
     last_month = history["month"].max()
-    last_date = datetime.strptime(last_month, "%Y-%m")
+    last_period = month_period(last_month)
     future_months = [
-        (last_date + relativedelta(months=i+1)).strftime("%Y-%m")
+        month_end_label((last_period + (i + 1)).strftime("%Y-%m"))
         for i in range(360)
     ]
     

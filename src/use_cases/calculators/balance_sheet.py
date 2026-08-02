@@ -4,6 +4,7 @@ from collections import defaultdict
 from src.domain.entities.models import Asset, Market, Account, AssetClass, Month
 from src.constants import AccountId, AccountType, AssetClassId, Currency
 from src.use_cases.dtos.output import BalanceSheet, CashFlowStatement
+from src.utils.months import month_end_label
 
 
 class BalanceSheetCalculator:
@@ -43,6 +44,7 @@ class BalanceSheetCalculator:
 
             current_assets = assets_by_month[month]
             market = self._market_for_month(month, market_cache, market_months)
+            month_label = month_end_label(month)
 
             liquid_total = 0.0
             risk_total = 0.0
@@ -73,7 +75,7 @@ class BalanceSheetCalculator:
 
             total_assets = liquid_total + risk_total + pension_total
 
-            cf = cf_map.get(month)
+            cf = cf_map.get(month_label)
             net_worth_contribution = cf.net_worth_contribution if cf else 0.0
 
             if not bs_list:
@@ -85,7 +87,7 @@ class BalanceSheetCalculator:
 
             bs_list.append(
                 BalanceSheet(
-                    month=Month(month),
+                    month=Month(month_label),
                     liquid_assets=int(liquid_total),
                     risk_assets=int(risk_total),
                     pension_assets=int(pension_total),

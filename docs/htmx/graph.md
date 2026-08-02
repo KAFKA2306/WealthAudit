@@ -64,7 +64,7 @@ All data originates from CSV files as defined in [schemas.md](../domain/schemas.
     - `after_tax_income` (Positive Bar, Green)
     - `expenditure` (Negative Bar, Red)
     - `investment_gain_loss` (Bar, Purple)
-    - `total_flow` = `net_savings + investment_gain_loss` (Line, Blue)
+    - `total_flow` = `net_savings + asset_contribution + investment_gain_loss` (Line, Blue)
 - **Moving Averages**: 12-month (Income, Total Flow)
 - **Reference**: See [bsplcf.md](../logics/bsplcf.md) for calculation logic.
 

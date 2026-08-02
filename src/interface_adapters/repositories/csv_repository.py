@@ -9,6 +9,7 @@ from src.domain.entities.models import (
     AssetClass,
     PaymentMethod,
 )
+from src.utils.months import month_end_label
 from src.constants import (
     AccountId,
     PaymentMethodId,
@@ -32,7 +33,7 @@ class CsvTransactionRepository(ITransactionRepository):
         df = pd.read_csv(f"{self.data_dir}/data/input/income.csv")
         return [
             Income(
-                month=row["month"],
+                month=month_end_label(row["month"]),
                 account_id=AccountId(row["account_id"]),
                 amount=row["amount"],
             )
@@ -43,7 +44,7 @@ class CsvTransactionRepository(ITransactionRepository):
         df = pd.read_csv(f"{self.data_dir}/data/input/expense.csv")
         return [
             Expense(
-                month=row["month"],
+                month=month_end_label(row["month"]),
                 method_id=PaymentMethodId(row["method_id"]),
                 amount=row["amount"],
             )
@@ -59,7 +60,7 @@ class CsvAssetRepository(IAssetRepository):
         df = pd.read_csv(f"{self.data_dir}/data/input/assets.csv")
         return [
             Asset(
-                month=row["month"],
+                month=month_end_label(row["month"]),
                 account_id=AccountId(row["account_id"]),
                 asset_class=AssetClassId(row["asset_class"]),
                 balance=float(row["balance"]),
@@ -76,7 +77,7 @@ class CsvMarketRepository(IMarketRepository):
         df = pd.read_csv(f"{self.data_dir}/data/input/market.csv")
         return [
             Market(
-                month=row["month"],
+                month=month_end_label(row["month"]),
                 usd_jpy=float(row["usd_jpy"]),
                 eur_jpy=float(row["eur_jpy"]),
                 sp500=float(row["sp500"]),

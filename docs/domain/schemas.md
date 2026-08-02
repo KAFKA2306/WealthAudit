@@ -36,7 +36,7 @@
 ## Data Models
 
 ```typescript
-type Month = string; // YYYY-MM
+type Month = string; // YYYY-MM-DD (month-end)
 
 interface Income {
   month: Month;
