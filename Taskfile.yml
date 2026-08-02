@@ -53,6 +53,11 @@ tasks:
     cmds:
       - uv run python scripts/forecast.py
 
+  audit:recalculate:
+    desc: Recalculate all outputs and export before/after numeric differences
+    cmds:
+      - uv run python scripts/recalculate_audit.py
+
   drive:import:
     desc: Import local Drive-synced input.xlsx into data/input/*.csv
     cmds:
