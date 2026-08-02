@@ -155,9 +155,11 @@ def main() -> None:
     
     normalized = normalized[all_ordered]
 
-    # Round numeric columns to 4 significant figures
+    # Keep raw income values exact; round the display-oriented columns only.
     numeric_cols = normalized.select_dtypes(include=["float64", "int64"]).columns
     for col in numeric_cols:
+        if col.startswith("収入_"):
+            continue
         normalized[col] = normalized[col].apply(
             lambda x: float(f"{x:.4g}") if pd.notna(x) else x
         )

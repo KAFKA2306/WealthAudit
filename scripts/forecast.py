@@ -971,19 +971,23 @@ def main() -> None:
     combined = calculate_metrics_vectorized(combined, geo_return)
     
     # 4. Rounding
-    # Round forecast values to nearest 1000 (yen values)
+    # Keep raw income values exact; round the display-oriented columns only.
     numeric_cols = combined.select_dtypes(include=["float64", "int64"]).columns
     
-    # All other numeric columns are treated as Yen amounts (round to nearest 1000)
-    # This includes: 収入_*, 支出_*, 分類_*, 資産_*
+    # Most yen-denominated columns are rounded for readability.
+    # Income is left exact so the view matches the source input.
     yen_prefixes = ("収入_", "支出_", "分類_", "資産_")
-    yen_cols = [c for c in numeric_cols if c.startswith(yen_prefixes)]
+    yen_cols = [
+        c for c in numeric_cols if c.startswith(yen_prefixes) and not c.startswith("収入_")
+    ]
     
     # Everything else is either Ratio or Man-yen amounts (liquid_assets, etc.)
     # User requested "4 significant figures" for these.
     # This covers: savings_rate, risk_asset_ratio, liquid_assets, risk_assets, 
     # investment_gain_loss, net_savings, etc.
-    sig_fig_cols = [c for c in numeric_cols if c not in yen_cols]
+    sig_fig_cols = [
+        c for c in numeric_cols if c not in yen_cols and not c.startswith("収入_")
+    ]
     
     # Special handling for monthly_alpha: threshold at 0.0001
     # User request: "monthly_alpha <= 0.0001 is zero"
