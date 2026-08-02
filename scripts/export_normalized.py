@@ -118,12 +118,8 @@ def _validate_jpy_reconciliation(normalized: pd.DataFrame) -> None:
             continue
         expected = float(row["total_financial_assets"]) * 10000.0
         tolerance = max(2.0, abs(expected) * 1e-9)
-        account_total = float(
-            pd.to_numeric(row[asset_columns], errors="coerce").fillna(0.0).sum()
-        )
-        class_total = float(
-            pd.to_numeric(row[class_columns], errors="coerce").fillna(0.0).sum()
-        )
+        account_total = float(pd.to_numeric(row[asset_columns], errors="coerce").fillna(0.0).sum())
+        class_total = float(pd.to_numeric(row[class_columns], errors="coerce").fillna(0.0).sum())
         if abs(account_total - expected) > tolerance:
             raise ValueError(
                 f"JPY reconciliation failed for account assets in {row['month']}: "
@@ -220,9 +216,10 @@ def main() -> None:
     ]
 
     normalized = income_by_account.merge(expense_by_method, on="month", how="outer")
-    normalized = normalized.merge(
-        pd.read_csv(calculated_dir / "cashflow.csv"), on="month", how="outer"
-    )
+    for filename in ("cashflow.csv",):
+        normalized = normalized.merge(
+            pd.read_csv(calculated_dir / filename), on="month", how="outer"
+        )
     normalized = normalized.merge(assets_by_account, on="month", how="outer")
     normalized = normalized.merge(assets_by_class, on="month", how="outer")
     for filename in ("balance_sheet.csv", "metrics.csv"):
