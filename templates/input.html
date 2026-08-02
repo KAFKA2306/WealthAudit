@@ -1,473 +1,75 @@
 <!DOCTYPE html>
 <html lang="ja">
-
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>月次入力</title>
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='18' fill='%2317233f'/%3E%3Ccircle cx='25' cy='32' r='12' fill='none' stroke='%23f1dfb5' stroke-width='5'/%3E%3Ccircle cx='41' cy='32' r='8' fill='%23c99a3a'/%3E%3C/svg%3E">
-    <style>
-        :root {
-            --canvas: #fbf8f1;
-            --surface: rgba(255, 255, 255, 0.88);
-            --surface-solid: #ffffff;
-            --ink: #13233f;
-            --muted: #788291;
-            --line: rgba(19, 35, 63, 0.1);
-            --gold: #c99a3a;
-            --gold-soft: #f1dfb5;
-            --navy: #17233f;
-            --danger: #b87460;
-            --shadow: 0 24px 80px rgba(23, 35, 63, 0.12);
-            --shadow-soft: 0 12px 32px rgba(23, 35, 63, 0.08);
-        }
-
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-
-        body {
-            min-height: 100vh;
-            color: var(--ink);
-            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-            background:
-                radial-gradient(circle at 8% 8%, rgba(241, 223, 181, 0.7), transparent 34rem),
-                radial-gradient(circle at 92% 0%, rgba(115, 139, 115, 0.2), transparent 30rem),
-                linear-gradient(135deg, #fffdf8 0%, var(--canvas) 54%, #f6efe0 100%);
-            padding: 32px;
-        }
-
-        body::before {
-            content: "";
-            position: fixed;
-            inset: 0;
-            pointer-events: none;
-            background-image:
-                linear-gradient(rgba(19, 35, 63, 0.035) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(19, 35, 63, 0.035) 1px, transparent 1px);
-            background-size: 44px 44px;
-            mask-image: linear-gradient(to bottom, black, transparent 78%);
-        }
-
-        a {
-            color: inherit;
-        }
-
-        .page {
-            position: relative;
-            width: min(1180px, 100%);
-            margin: 0 auto;
-        }
-
-        .topbar {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 20px;
-            margin-bottom: 28px;
-        }
-
-        .brand {
-            display: inline-flex;
-            align-items: center;
-            gap: 14px;
-            color: var(--navy);
-            text-decoration: none;
-            font-weight: 800;
-            letter-spacing: 0.08em;
-            text-transform: uppercase;
-        }
-
-        .brand-mark {
-            width: 44px;
-            height: 44px;
-            display: grid;
-            place-items: center;
-            border-radius: 50%;
-            background: linear-gradient(145deg, var(--navy), #263b67);
-            box-shadow: 0 12px 32px rgba(23, 35, 63, 0.24);
-        }
-
-        .brand-mark::before {
-            content: "";
-            width: 16px;
-            height: 16px;
-            border: 2px solid var(--gold-soft);
-            border-radius: 50%;
-            box-shadow: 10px 0 0 -3px var(--gold);
-        }
-
-        .pill {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            min-height: 44px;
-            padding: 0 18px;
-            border: 1px solid var(--line);
-            border-radius: 999px;
-            background: rgba(255, 255, 255, 0.76);
-            color: var(--muted);
-            text-decoration: none;
-            font-weight: 800;
-            font-size: 0.88rem;
-            box-shadow: var(--shadow-soft);
-            backdrop-filter: blur(16px);
-            transition: transform 180ms ease, color 180ms ease;
-        }
-
-        .pill:hover {
-            transform: translateY(-2px);
-            color: var(--ink);
-        }
-
-        section {
-            border: 1px solid rgba(255, 255, 255, 0.72);
-            background: var(--surface);
-            box-shadow: var(--shadow);
-            backdrop-filter: blur(22px);
-        }
-
-        h1 {
-            color: var(--navy);
-            font-size: clamp(2rem, 5vw, 3rem);
-            line-height: 1.15;
-            margin-bottom: 24px;
-        }
-
-        section h2 {
-            color: var(--navy);
-            font-size: 1.45rem;
-            font-weight: 800;
-        }
-
-        form {
-            display: grid;
-            gap: 24px;
-        }
-
-        section {
-            border-radius: 28px;
-            padding: 28px;
-        }
-
-        .section-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 20px;
-            margin-bottom: 18px;
-        }
-
-        .field {
-            display: grid;
-            gap: 10px;
-        }
-
-        label {
-            color: var(--muted);
-            font-size: 0.78rem;
-            font-weight: 800;
-            letter-spacing: 0.04em;
-        }
-
-        .table-wrap {
-            overflow-x: auto;
-            border: 1px solid var(--line);
-            border-radius: 22px;
-            background: rgba(255, 255, 255, 0.7);
-        }
-
-        table {
-            width: 100%;
-            min-width: 720px;
-            border-collapse: collapse;
-        }
-
-        th,
-        td {
-            text-align: left;
-            padding: 15px 16px;
-            border-bottom: 1px solid rgba(19, 35, 63, 0.08);
-        }
-
-        th {
-            color: var(--muted);
-            font-size: 0.72rem;
-            font-weight: 800;
-            letter-spacing: 0.04em;
-            background: rgba(246, 239, 224, 0.62);
-        }
-
-        tr:last-child td {
-            border-bottom: 0;
-        }
-
-        input[type="number"],
-        input[type="text"],
-        input[type="month"] {
-            width: 100%;
-            min-height: 46px;
-            border: 1px solid rgba(19, 35, 63, 0.12);
-            border-radius: 14px;
-            background: rgba(255, 255, 255, 0.84);
-            color: var(--ink);
-            font: inherit;
-            font-weight: 700;
-            padding: 0 14px;
-            outline: none;
-            transition: border-color 160ms ease, box-shadow 160ms ease;
-        }
-
-        input:focus {
-            border-color: rgba(201, 154, 58, 0.7);
-            box-shadow: 0 0 0 4px rgba(201, 154, 58, 0.14);
-        }
-
-        input[readonly] {
-            color: var(--muted);
-            background: rgba(246, 239, 224, 0.58);
-        }
-
-        .button-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 14px;
-            flex-wrap: wrap;
-            margin-top: 18px;
-        }
-
-        button {
-            min-height: 46px;
-            border: 0;
-            border-radius: 999px;
-            padding: 0 20px;
-            cursor: pointer;
-            color: var(--navy);
-            background: #fff;
-            box-shadow: var(--shadow-soft);
-            font: inherit;
-            font-size: 0.88rem;
-            font-weight: 800;
-            transition: transform 180ms ease, box-shadow 180ms ease;
-        }
-
-        button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 18px 42px rgba(23, 35, 63, 0.14);
-        }
-
-        .save-button {
-            min-height: 56px;
-            padding: 0 30px;
-            background: linear-gradient(135deg, #17233f 0%, #273a66 52%, #c99a3a 180%);
-            color: #fffaf0;
-        }
-
-        .row-del {
-            width: 52px;
-            color: var(--danger);
-            cursor: pointer;
-            text-align: center;
-            font-weight: 800;
-        }
-
-        .row-del:hover {
-            color: #8e4f40;
-        }
-
-        .actions {
-            display: flex;
-            justify-content: flex-end;
-            padding-bottom: 12px;
-        }
-
-        @media (max-width: 920px) {
-            body {
-                padding: 20px;
-            }
-        }
-
-        @media (max-width: 640px) {
-            .topbar,
-            .section-header,
-            .button-row,
-            .actions {
-                align-items: stretch;
-                flex-direction: column;
-            }
-
-            .topbar {
-                align-items: flex-start;
-            }
-
-            section,
-            .page {
-                border-radius: 24px;
-            }
-
-            section {
-                padding: 22px;
-            }
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>月次入力</title>
+  <style>
+    :root { color-scheme: light; --ink:#13233f; --muted:#788291; --line:#dfe3e8; --bg:#fbf8f1; --card:#fff; }
+    * { box-sizing:border-box; }
+    body { margin:0; padding:24px; font-family:system-ui,sans-serif; color:var(--ink); background:var(--bg); }
+    main { width:min(1120px,100%); margin:auto; }
+    nav { display:flex; justify-content:space-between; margin-bottom:24px; }
+    section { background:var(--card); border:1px solid var(--line); border-radius:18px; padding:20px; margin-bottom:18px; }
+    .table-wrap { overflow-x:auto; }
+    table { width:100%; min-width:760px; border-collapse:collapse; }
+    th,td { padding:10px; text-align:left; border-bottom:1px solid var(--line); }
+    input { width:100%; min-height:42px; padding:8px 10px; border:1px solid var(--line); border-radius:10px; }
+    button,.pill { display:inline-flex; align-items:center; min-height:42px; padding:0 18px; border:0; border-radius:999px; text-decoration:none; background:var(--ink); color:white; font-weight:700; }
+    .row-del { cursor:pointer; color:#a34d3b; }
+  </style>
 </head>
-
 <body>
-    {% macro transaction_section(title, table_id, id_heading, items, kind, add_label=None) %}
+<main>
+  <nav><strong>WealthAudit</strong><a class="pill" href="/">ダッシュボード</a></nav>
+  <h1>月次入力</h1>
+  <form method="POST" action="/input">
     <section>
-        <div class="section-header">
-            <h2>{{ title }}</h2>
-        </div>
-        <div class="table-wrap">
-            <table id="{{ table_id }}">
-                <thead>
-                    <tr>
-                        <th>名称</th>
-                        <th>{{ id_heading }}</th>
-                        <th>金額</th>
-                        <th></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for item in items %}
-                    <tr>
-                        <td>{{ item.name }}</td>
-                        {% if kind == "income" %}
-                        <td><input type="text" name="income_account[]" value="{{ item.account_id }}" readonly></td>
-                        <td><input type="number" name="income_amount[]" value="" placeholder="目安: {{ item.suggested_amount }}"></td>
-                        {% else %}
-                        <td><input type="text" name="expense_method[]" value="{{ item.method_id }}" readonly></td>
-                        <td><input type="number" name="expense_amount[]" value="" placeholder="目安: {{ item.suggested_amount }}"></td>
-                        {% endif %}
-                        <td class="row-del" onclick="this.parentElement.remove()">削除</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-        {% if add_label %}
-        <div class="button-row">
-            <button type="button" onclick="addRow('{{ table_id }}', '{{ kind }}')">{{ add_label }}</button>
-        </div>
+      <h2>対象月</h2>
+      <input type="month" name="target_month" value="{{ target_month }}" required>
+    </section>
+
+    {% macro transaction(title, table_id, items, kind) %}
+    <section>
+      <h2>{{ title }}</h2>
+      <div class="table-wrap"><table id="{{ table_id }}"><thead><tr><th>名称</th><th>ID</th><th>金額</th><th></th></tr></thead><tbody>
+      {% for item in items %}
+        <tr><td>{{ item.name }}</td>
+        {% if kind == 'income' %}
+          <td><input name="income_account[]" value="{{ item.account_id }}" readonly></td>
+          <td><input type="number" name="income_amount[]" value="" placeholder="目安: {{ item.suggested_amount }}"></td>
+        {% else %}
+          <td><input name="expense_method[]" value="{{ item.method_id }}" readonly></td>
+          <td><input type="number" name="expense_amount[]" value="" placeholder="目安: {{ item.suggested_amount }}"></td>
         {% endif %}
+        <td class="row-del" onclick="this.parentElement.remove()">削除</td></tr>
+      {% endfor %}
+      </tbody></table></div>
     </section>
     {% endmacro %}
 
-    {% macro assets_section(items) %}
+    {{ transaction('収入','income-table',income_items,'income') }}
+    {{ transaction('カード支払','card-table',card_items,'expense') }}
+    {{ transaction('その他支出','other-expense-table',other_expense_items,'expense') }}
+
     <section>
-        <div class="section-header">
-            <h2>資産</h2>
-        </div>
-        <div class="table-wrap">
-            <table id="asset-table">
-                <thead>
-                    <tr>
-                        <th>名称</th>
-                        <th>口座ID</th>
-                        <th>分類</th>
-                        <th>残高</th>
-                        <th></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for item in items %}
-                    <tr>
-                        <td>{{ item.name }}</td>
-                        <td><input type="text" name="asset_account[]" value="{{ item.account_id }}" readonly></td>
-                        <td><input type="text" name="asset_class[]" value="{{ item.asset_class }}" readonly></td>
-                        <td><input type="number" name="asset_balance[]" value="" placeholder="目安: {{ item.suggested_balance }}"></td>
-                        <td class="row-del" onclick="this.parentElement.remove()">削除</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
+      <h2>資産</h2>
+      <p>残高は通貨単位のまま入力します。multi口座では通貨が必須です。</p>
+      <div class="table-wrap"><table id="asset-table"><thead><tr><th>名称</th><th>口座ID</th><th>分類</th><th>通貨</th><th>残高</th><th></th></tr></thead><tbody>
+      {% for item in asset_items %}
+        <tr>
+          <td>{{ item.name }}</td>
+          <td><input name="asset_account[]" value="{{ item.account_id }}" readonly></td>
+          <td><input name="asset_class[]" value="{{ item.asset_class }}" readonly></td>
+          <td><input name="asset_currency[]" value="{{ item.native_currency }}" placeholder="JPY / USD / EUR"></td>
+          <td><input type="number" step="any" name="asset_balance[]" value="" placeholder="目安: {{ item.suggested_balance }}"></td>
+          <td class="row-del" onclick="this.parentElement.remove()">削除</td>
+        </tr>
+      {% endfor %}
+      </tbody></table></div>
     </section>
-    {% endmacro %}
-
-    <main class="page">
-        <nav class="topbar" aria-label="メイン">
-            <a class="brand" href="/" aria-label="ダッシュボードへ戻る">
-                <span class="brand-mark" aria-hidden="true"></span>
-                BSPL
-            </a>
-            <a class="pill" href="/">ダッシュボード</a>
-        </nav>
-
-        <h1 id="input-title">月次入力</h1>
-
-        <form method="POST" action="/input">
-            <section>
-                <div class="section-header">
-                    <h2>対象月</h2>
-                </div>
-                <div class="field">
-                    <label for="target_month">年月</label>
-                    <input id="target_month" type="month" name="target_month" value="{{ target_month }}" required>
-                </div>
-            </section>
-
-            {{ transaction_section(
-                "収入",
-                "income-table",
-                "口座ID",
-                income_items,
-                "income",
-                "収入を追加"
-            ) }}
-
-            {{ transaction_section(
-                "カード支払",
-                "card-table",
-                "支払方法ID",
-                card_items,
-                "expense"
-            ) }}
-
-            {{ transaction_section(
-                "その他支出",
-                "other-expense-table",
-                "支払方法ID",
-                other_expense_items,
-                "expense",
-                "支出を追加"
-            ) }}
-
-            {{ assets_section(asset_items) }}
-
-            <div class="actions">
-                <button class="save-button" type="submit">保存</button>
-            </div>
-        </form>
-    </main>
-
-    <script>
-        function addRow(tableId, type) {
-            const tbody = document.getElementById(tableId).querySelector("tbody");
-            const newRow = document.createElement("tr");
-
-            if (type === "income") {
-                newRow.innerHTML = `
-                    <td>手入力</td>
-                    <td><input type="text" name="income_account[]" placeholder="口座ID"></td>
-                    <td><input type="number" name="income_amount[]" placeholder="金額"></td>
-                    <td class="row-del" onclick="this.parentElement.remove()">削除</td>
-                `;
-            } else if (type === "expense") {
-                newRow.innerHTML = `
-                    <td>手入力</td>
-                    <td><input type="text" name="expense_method[]" placeholder="支払方法ID"></td>
-                    <td><input type="number" name="expense_amount[]" placeholder="金額"></td>
-                    <td class="row-del" onclick="this.parentElement.remove()">削除</td>
-                `;
-            }
-
-            tbody.appendChild(newRow);
-        }
-    </script>
+    <button type="submit">保存</button>
+  </form>
+</main>
 </body>
-
 </html>
