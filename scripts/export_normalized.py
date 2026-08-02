@@ -1,169 +1,283 @@
-"""
-Export normalized table by joining all input and calculated CSVs.
+"""Export a single JPY-denominated normalized table.
 
-Combines:
-- data/input: assets.csv, income.csv, expense.csv (pivoted by master patterns)
-- data/calculated: balance_sheet.csv, cashflow.csv, metrics.csv
-- master: accounts.csv, asset_classes.csv, payment_methods.csv
-
-All tables are joined on 'month' as the primary key.
-Columns are expanded based on master CSV patterns.
+Native balances remain available in ``asset_valuations.csv``. All ``資産_*`` and
+``分類_*`` columns in ``normalized.csv`` are JPY values and are reconciled to the
+balance-sheet totals.
 """
+
+from __future__ import annotations
+
+from pathlib import Path
 
 import pandas as pd
-from pathlib import Path
+
+from src.constants import AccountId, AccountType, AssetClassId, Currency
+from src.domain.entities.models import Account, Asset, AssetClass, Market
+from src.use_cases.valuation import value_assets
+
+
+def _load_accounts(path: Path) -> list[Account]:
+    frame = pd.read_csv(path)
+    return [
+        Account(
+            id=AccountId(row["account_id"]),
+            name=str(row["name"]),
+            type=AccountType(row["type"]),
+            currency=Currency(row["currency"]),
+            risk=int(row["risk"]),
+        )
+        for _, row in frame.iterrows()
+    ]
+
+
+def _load_asset_classes(path: Path) -> list[AssetClass]:
+    frame = pd.read_csv(path)
+    return [
+        AssetClass(
+            id=AssetClassId(row["class_id"]),
+            name=str(row["name"]),
+            risk_level=int(row["risk_level"]),
+        )
+        for _, row in frame.iterrows()
+    ]
+
+
+def _row_currency(row: pd.Series) -> Currency | None:
+    for column in ("native_currency", "currency"):
+        if column in row.index and pd.notna(row[column]) and str(row[column]).strip():
+            return Currency(str(row[column]).strip())
+    return None
+
+
+def _row_balance(row: pd.Series) -> float:
+    for column in ("native_balance", "balance"):
+        if column in row.index and pd.notna(row[column]):
+            return float(row[column])
+    raise ValueError("assets.csv requires native_balance or balance")
+
+
+def _load_assets(path: Path) -> list[Asset]:
+    frame = pd.read_csv(path)
+    return [
+        Asset(
+            month=row["month"],
+            account_id=AccountId(row["account_id"]),
+            asset_class=AssetClassId(row["asset_class"]),
+            native_balance=_row_balance(row),
+            native_currency=_row_currency(row),
+        )
+        for _, row in frame.iterrows()
+    ]
+
+
+def _load_markets(path: Path) -> list[Market]:
+    frame = pd.read_csv(path)
+    return [
+        Market(
+            month=row["month"],
+            usd_jpy=float(row["usd_jpy"]),
+            eur_jpy=float(row["eur_jpy"]),
+            sp500=float(row["sp500"]),
+        )
+        for _, row in frame.iterrows()
+    ]
+
+
+def _pivot(
+    frame: pd.DataFrame,
+    column: str,
+    names: dict[str, str],
+    prefix: str,
+    required_ids: list[str],
+) -> pd.DataFrame:
+    result = frame.pivot_table(
+        index="month",
+        columns=column,
+        values="jpy_value",
+        aggfunc="sum",
+        fill_value=0.0,
+    ).reset_index()
+    for item_id in required_ids:
+        if item_id not in result.columns:
+            result[item_id] = 0.0
+    renamed = ["month"] + [
+        f"{prefix}{names.get(str(item), str(item))}" for item in result.columns[1:]
+    ]
+    result.columns = renamed
+    return result
+
+
+def _validate_jpy_reconciliation(normalized: pd.DataFrame) -> None:
+    asset_columns = [column for column in normalized if column.startswith("資産_")]
+    class_columns = [column for column in normalized if column.startswith("分類_")]
+    if "total_financial_assets" not in normalized:
+        return
+
+    for _, row in normalized.iterrows():
+        if pd.isna(row.get("total_financial_assets")):
+            continue
+        expected = float(row["total_financial_assets"]) * 10000.0
+        tolerance = max(2.0, abs(expected) * 1e-9)
+        account_total = float(
+            pd.to_numeric(row[asset_columns], errors="coerce").fillna(0.0).sum()
+        )
+        class_total = float(
+            pd.to_numeric(row[class_columns], errors="coerce").fillna(0.0).sum()
+        )
+        if abs(account_total - expected) > tolerance:
+            raise ValueError(
+                f"JPY reconciliation failed for account assets in {row['month']}: "
+                f"{account_total} != {expected}"
+            )
+        if abs(class_total - expected) > tolerance:
+            raise ValueError(
+                f"JPY reconciliation failed for asset classes in {row['month']}: "
+                f"{class_total} != {expected}"
+            )
 
 
 def main() -> None:
-    """Join all input and calculated CSVs and export as a normalized table."""
-    base_dir = Path(__file__).parent.parent
-    data_dir = base_dir / "data"
-    input_dir = data_dir / "input"
-    calculated_dir = data_dir / "calculated"
+    base_dir = Path(__file__).resolve().parent.parent
+    input_dir = base_dir / "data" / "input"
+    calculated_dir = base_dir / "data" / "calculated"
     master_dir = base_dir / "master"
-    output_path = calculated_dir / "normalized.csv"
+    calculated_dir.mkdir(parents=True, exist_ok=True)
 
-    # Load master files
-    accounts = pd.read_csv(master_dir / "accounts.csv")
-    asset_classes = pd.read_csv(master_dir / "asset_classes.csv")
-    payment_methods = pd.read_csv(master_dir / "payment_methods.csv")
+    accounts = _load_accounts(master_dir / "accounts.csv")
+    asset_classes = _load_asset_classes(master_dir / "asset_classes.csv")
+    assets = _load_assets(input_dir / "assets.csv")
+    markets = _load_markets(input_dir / "market.csv")
+    valuations = value_assets(assets, markets, accounts)
 
-    # Create ID to name mappings
-    account_names = dict(zip(accounts["account_id"], accounts["name"]))
-    class_names = dict(zip(asset_classes["class_id"], asset_classes["name"]))
-    method_names = dict(zip(payment_methods["method_id"], payment_methods["name"]))
+    valuation_frame = pd.DataFrame(
+        [
+            {
+                "month": item.month,
+                "account_id": item.account_id.value,
+                "asset_class": item.asset_class.value,
+                "native_currency": item.native_currency.value,
+                "native_balance": item.native_balance,
+                "fx_rate_to_jpy": item.fx_rate_to_jpy,
+                "jpy_value": item.jpy_value,
+            }
+            for item in valuations
+        ]
+    )
+    valuation_frame.to_csv(calculated_dir / "asset_valuations.csv", index=False)
 
-    # Load input CSVs
-    assets = pd.read_csv(input_dir / "assets.csv")
+    account_names = {item.id.value: item.name for item in accounts}
+    class_names = {item.id.value: item.name for item in asset_classes}
+    assets_by_account = _pivot(
+        valuation_frame,
+        "account_id",
+        account_names,
+        "資産_",
+        list(account_names),
+    )
+    assets_by_class = _pivot(
+        valuation_frame,
+        "asset_class",
+        class_names,
+        "分類_",
+        list(class_names),
+    )
+
     income = pd.read_csv(input_dir / "income.csv")
     expense = pd.read_csv(input_dir / "expense.csv")
+    payment_methods = pd.read_csv(master_dir / "payment_methods.csv")
+    method_names = dict(
+        zip(payment_methods["method_id"].astype(str), payment_methods["name"].astype(str))
+    )
 
-    # Pivot assets by account_id (balance per account)
-    assets_by_account = assets.pivot_table(
-        index="month",
-        columns="account_id",
-        values="balance",
-        aggfunc="sum",
-        fill_value=0,
-    ).reset_index()
-    # Ensure all accounts exist
-    for acc_id in accounts["account_id"]:
-        if acc_id not in assets_by_account.columns:
-            assets_by_account[acc_id] = 0
-    assets_by_account.columns = ["month"] + [
-        f"資産_{account_names.get(col, col)}" for col in assets_by_account.columns[1:]
-    ]
-
-    # Pivot assets by asset_class (balance per asset class)
-    assets_by_class = assets.pivot_table(
-        index="month",
-        columns="asset_class",
-        values="balance",
-        aggfunc="sum",
-        fill_value=0,
-    ).reset_index()
-    # Ensure all asset classes exist
-    for class_id in asset_classes["class_id"]:
-        if class_id not in assets_by_class.columns:
-            assets_by_class[class_id] = 0
-    assets_by_class.columns = ["month"] + [
-        f"分類_{class_names.get(col, col)}" for col in assets_by_class.columns[1:]
-    ]
-
-    # Pivot income by account_id
     income_by_account = income.pivot_table(
         index="month",
         columns="account_id",
         values="amount",
         aggfunc="sum",
-        fill_value=0,
+        fill_value=0.0,
     ).reset_index()
-    # Ensure all accounts exist (for income)
-    for acc_id in accounts["account_id"]:
-        if acc_id not in income_by_account.columns:
-            income_by_account[acc_id] = 0
+    for account_id in account_names:
+        if account_id not in income_by_account.columns:
+            income_by_account[account_id] = 0.0
     income_by_account.columns = ["month"] + [
-        f"収入_{account_names.get(col, col)}" for col in income_by_account.columns[1:]
+        f"収入_{account_names.get(str(column), str(column))}"
+        for column in income_by_account.columns[1:]
     ]
 
-    # Pivot expense by method_id
     expense_by_method = expense.pivot_table(
         index="month",
         columns="method_id",
         values="amount",
         aggfunc="sum",
-        fill_value=0,
+        fill_value=0.0,
     ).reset_index()
-    # Ensure all payment methods exist
-    for method_id in payment_methods["method_id"]:
+    for method_id in method_names:
         if method_id not in expense_by_method.columns:
-            expense_by_method[method_id] = 0
+            expense_by_method[method_id] = 0.0
     expense_by_method.columns = ["month"] + [
-        f"支出_{method_names.get(col, col)}" for col in expense_by_method.columns[1:]
+        f"支出_{method_names.get(str(column), str(column))}"
+        for column in expense_by_method.columns[1:]
     ]
 
-    # Load all calculated CSVs
-    balance_sheet = pd.read_csv(calculated_dir / "balance_sheet.csv")
-    cashflow = pd.read_csv(calculated_dir / "cashflow.csv")
-    metrics = pd.read_csv(calculated_dir / "metrics.csv")
-
-    # Join all tables on 'month' column
-    # Order: P/L (income → expense) → B/S (class → account) → calculated metrics
     normalized = income_by_account.merge(expense_by_method, on="month", how="outer")
-    normalized = normalized.merge(cashflow, on="month", how="outer")
-    normalized = normalized.merge(assets_by_class, on="month", how="outer")
+    normalized = normalized.merge(
+        pd.read_csv(calculated_dir / "cashflow.csv"), on="month", how="outer"
+    )
     normalized = normalized.merge(assets_by_account, on="month", how="outer")
-    normalized = normalized.merge(balance_sheet, on="month", how="outer")
-    normalized = normalized.merge(metrics, on="month", how="outer")
-
-    # Sort by month
-    normalized = normalized.sort_values("month").reset_index(drop=True)
-
-    # Define column order based on finance logic
-    # 1. month (primary key)
-    # 2. P/L: 収入 (income) → 支出 (expense) → net savings
-    # 3. B/S: 分類 (asset class) → 資産 (by account) → balance sheet totals
-    # 4. Metrics: ratios and returns
-    col_order = ["month"]
-    income_cols = sorted([c for c in normalized.columns if c.startswith("収入_")])
-    expense_cols = sorted([c for c in normalized.columns if c.startswith("支出_")])
-    cashflow_cols = ["after_tax_income", "expenditure", "net_savings"]
-    class_cols = sorted([c for c in normalized.columns if c.startswith("分類_")])
-    asset_cols = sorted([c for c in normalized.columns if c.startswith("資産_")])
-    bs_cols = ["liquid_assets", "risk_assets", "pension_assets", "total_financial_assets", "investment_gain_loss"]
-    metric_cols = ["savings_rate", "risk_asset_ratio", "monthly_return", "monthly_alpha", 
-                   "benchmark_return", "fi_ratio_12m", "fi_ratio_48m", "fi_ratio_next_12m"]
-    
-    # Filter to only include columns that exist
-    all_ordered = col_order + income_cols + expense_cols
-    all_ordered += [c for c in cashflow_cols if c in normalized.columns]
-    # Swap: 資産 (Asset Account) first, then 分類 (Asset Class)
-    all_ordered += asset_cols + class_cols
-    all_ordered += [c for c in bs_cols if c in normalized.columns]
-    all_ordered += [c for c in metric_cols if c in normalized.columns]
-    
-    # Add any remaining columns not in the order
-    remaining = [c for c in normalized.columns if c not in all_ordered]
-    all_ordered += remaining
-    
-    normalized = normalized[all_ordered]
-
-    # Round numeric columns to 4 significant figures
-    numeric_cols = normalized.select_dtypes(include=["float64", "int64"]).columns
-    for col in numeric_cols:
-        normalized[col] = normalized[col].apply(
-            lambda x: float(f"{x:.4g}") if pd.notna(x) else x
+    normalized = normalized.merge(assets_by_class, on="month", how="outer")
+    for filename in ("balance_sheet.csv", "metrics.csv"):
+        normalized = normalized.merge(
+            pd.read_csv(calculated_dir / filename), on="month", how="outer"
         )
 
-    # Export to CSV
-    normalized.to_csv(output_path, index=False)
-    print(f"Exported normalized table to: {output_path}")
-    print(f"Rows: {len(normalized)}, Columns: {len(normalized.columns)}")
-    print("\nColumn order (finance logic):")
-    print("  1. month")
-    print("  2. P/L: 収入_* → 支出_* → cashflow")
-    print("  3. B/S: 資産_* (Account) → 分類_* (Class) → balance_sheet")
-    print("  4. Metrics: ratios, returns")
+    normalized = normalized.sort_values("month").reset_index(drop=True)
+    ordered = ["month"]
+    ordered += sorted(column for column in normalized if column.startswith("収入_"))
+    ordered += sorted(column for column in normalized if column.startswith("支出_"))
+    ordered += [
+        column
+        for column in (
+            "after_tax_income",
+            "expenditure",
+            "net_savings",
+            "asset_contribution",
+            "net_worth_contribution",
+        )
+        if column in normalized
+    ]
+    ordered += sorted(column for column in normalized if column.startswith("資産_"))
+    ordered += sorted(column for column in normalized if column.startswith("分類_"))
+    ordered += [
+        column
+        for column in (
+            "liquid_assets",
+            "risk_assets",
+            "pension_assets",
+            "total_financial_assets",
+            "investment_gain_loss",
+            "return_base_assets",
+            "savings_rate",
+            "risk_asset_ratio",
+            "raw_monthly_return",
+            "monthly_return",
+            "raw_benchmark_return",
+            "benchmark_return",
+            "monthly_alpha",
+            "fi_ratio_12m",
+            "fi_ratio_48m",
+            "fi_ratio_next_12m",
+        )
+        if column in normalized
+    ]
+    ordered += [column for column in normalized if column not in ordered]
+    normalized = normalized[ordered]
+
+    _validate_jpy_reconciliation(normalized)
+    normalized.to_csv(calculated_dir / "normalized.csv", index=False)
+    print(
+        "Exported normalized.csv with JPY-denominated asset columns and "
+        "asset_valuations.csv with native units"
+    )
 
 
 if __name__ == "__main__":
