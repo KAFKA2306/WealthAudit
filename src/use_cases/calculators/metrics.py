@@ -1,8 +1,37 @@
+from __future__ import annotations
+
+import math
 from datetime import datetime
-from typing import List, Optional, Tuple
-from src.constants import EXPECTED_ANNUAL_RETURN
+from typing import Iterable, List
+
+from src.constants import PORTFOLIO_EXPECTED_ANNUAL_RETURN
 from src.domain.entities.models import Market, Month
 from src.use_cases.dtos.output import BalanceSheet, CashFlowStatement, FinancialMetrics
+from src.use_cases.valuation import previous_month
+
+
+def _calendar_months_ending(month: str, count: int) -> list[str]:
+    end = datetime.strptime(month, "%Y-%m")
+    result: list[str] = []
+    year = end.year
+    month_number = end.month
+    for _ in range(count):
+        result.append(f"{year:04d}-{month_number:02d}")
+        month_number -= 1
+        if month_number == 0:
+            year -= 1
+            month_number = 12
+    return result
+
+
+def _geometric_mean(values: Iterable[float]) -> float:
+    usable = [value for value in values if math.isfinite(value) and value > -1]
+    if not usable:
+        return math.nan
+    product = 1.0
+    for value in usable:
+        product *= 1.0 + value
+    return product ** (1.0 / len(usable)) - 1.0
 
 
 class MetricsCalculator:
@@ -12,150 +41,103 @@ class MetricsCalculator:
         bs_statements: List[BalanceSheet],
         markets: List[Market],
     ) -> List[FinancialMetrics]:
-        cf_map = {cf.month: cf for cf in cf_statements}
-        bs_map = {bs.month: bs for bs in bs_statements}
-        market_map = {m.month: m for m in markets}
+        cf_map = {str(item.month): item for item in cf_statements}
+        bs_map = {str(item.month): item for item in bs_statements}
+        market_map = {str(item.month): item for item in markets}
+        raw_returns: dict[str, float] = {}
+        raw_benchmarks: dict[str, float] = {}
+        metrics: list[FinancialMetrics] = []
 
-        months = sorted(
-            list(set(cf_map.keys()) | set(bs_map.keys()) | set(market_map.keys()))
-        )
+        for month in sorted(set(cf_map) & set(bs_map)):
+            cf = cf_map[month]
+            bs = bs_map[month]
+            previous = previous_month(month)
 
-        def get_past_n_months_sums(
-            current_month_str: str, n: int
-        ) -> Tuple[int, int, int, int]:
-            curr_date = datetime.strptime(current_month_str, "%Y-%m")
-            curr_y = curr_date.year
-            curr_m = curr_date.month
+            if bs.return_base_assets > 0:
+                raw_return = bs.investment_gain_loss / bs.return_base_assets
+            else:
+                raw_return = math.nan
+            raw_returns[month] = raw_return
 
-            total_gain = 0
-            total_expense = 0
-            total_income = 0
-            total_savings = 0
+            current_market = market_map.get(month)
+            previous_market = market_map.get(previous)
+            raw_benchmark = math.nan
+            if current_market is not None and previous_market is not None:
+                current_value = current_market.sp500 * current_market.usd_jpy
+                previous_value = previous_market.sp500 * previous_market.usd_jpy
+                if previous_value > 0:
+                    raw_benchmark = current_value / previous_value - 1.0
+            raw_benchmarks[month] = raw_benchmark
 
-            for i in range(n):
-                month_idx = curr_y * 12 + (curr_m - 1) - i
-                y = month_idx // 12
-                m = (month_idx % 12) + 1
+            trailing_months = _calendar_months_ending(month, 12)
+            monthly_return = _geometric_mean(
+                raw_returns.get(item, math.nan) for item in trailing_months
+            )
+            benchmark_return = _geometric_mean(
+                raw_benchmarks.get(item, math.nan) for item in trailing_months
+            )
+            alpha = (
+                monthly_return - benchmark_return
+                if math.isfinite(monthly_return) and math.isfinite(benchmark_return)
+                else math.nan
+            )
 
-                m_str = f"{y:04d}-{m:02d}"
+            income_12m = sum(
+                cf_map[item].after_tax_income
+                for item in trailing_months
+                if item in cf_map
+            )
+            savings_12m = sum(
+                cf_map[item].net_savings for item in trailing_months if item in cf_map
+            )
+            expense_12m = sum(
+                cf_map[item].expenditure for item in trailing_months if item in cf_map
+            )
+            gain_12m = sum(
+                bs_map[item].investment_gain_loss
+                for item in trailing_months
+                if item in bs_map
+            )
+            trailing_48 = _calendar_months_ending(month, 48)
+            expense_48m = sum(
+                cf_map[item].expenditure for item in trailing_48 if item in cf_map
+            )
+            gain_48m = sum(
+                bs_map[item].investment_gain_loss
+                for item in trailing_48
+                if item in bs_map
+            )
 
-                bs_item = bs_map.get(Month(m_str))
-                cf_item = cf_map.get(Month(m_str))
+            savings_rate = savings_12m / income_12m if income_12m else 0.0
+            risk_ratio = (
+                (bs.risk_assets + bs.pension_assets) / bs.total_financial_assets
+                if bs.total_financial_assets
+                else 0.0
+            )
+            fi_12 = gain_12m / expense_12m if expense_12m else 0.0
+            fi_48 = gain_48m / expense_48m if expense_48m else 0.0
+            fi_next = (
+                (bs.risk_assets + bs.pension_assets)
+                * PORTFOLIO_EXPECTED_ANNUAL_RETURN
+                / expense_12m
+                if expense_12m
+                else 0.0
+            )
 
-                if bs_item:
-                    total_gain += bs_item.investment_gain_loss
-                if cf_item:
-                    total_expense += cf_item.expenditure
-                    total_income += cf_item.after_tax_income
-                    total_savings += cf_item.net_savings
-
-            return total_gain, total_expense, total_income, total_savings
-
-        metrics_list: List[FinancialMetrics] = []
-
-
-        prev_bs: Optional[BalanceSheet] = None
-        prev_market: Optional[Market] = None
-
-        raw_returns_window: List[float] = []
-        raw_benchmarks_window: List[float] = []
-
-        for month in months:
-            cf = cf_map.get(Month(month))
-            bs = bs_map.get(Month(month))
-            market = market_map.get(Month(month))
-
-            if not cf or not bs:
-                continue
-
-            savings_rate = 0.0
-
-            _, _, sum_income_12m, sum_savings_12m = get_past_n_months_sums(month, 12)
-
-            if sum_income_12m != 0:
-                savings_rate = sum_savings_12m / sum_income_12m
-
-            risk_ratio = 0.0
-            if bs.total_financial_assets != 0:
-                risk_ratio = (
-                    bs.risk_assets + bs.pension_assets
-                ) / bs.total_financial_assets
-
-            raw_monthly_return = 0.0
-            prev_risk_assets = 0
-            if prev_bs:
-                prev_risk_assets = prev_bs.risk_assets
-                if prev_risk_assets > 0:
-                    raw_monthly_return = bs.investment_gain_loss / prev_risk_assets
-
-            raw_benchmark_return = 0.0
-
-            if market and prev_market:
-                # Calculate JPY denominated SP500 for both months
-                current_sp500_jpy = market.sp500 * market.usd_jpy
-                prev_sp500_jpy = prev_market.sp500 * prev_market.usd_jpy
-
-                if prev_sp500_jpy > 0:
-                    raw_benchmark_return = (current_sp500_jpy / prev_sp500_jpy) - 1
-
-            raw_returns_window.append(raw_monthly_return)
-            raw_benchmarks_window.append(raw_benchmark_return)
-
-            if len(raw_returns_window) > 12:
-                raw_returns_window.pop(0)
-            if len(raw_benchmarks_window) > 12:
-                raw_benchmarks_window.pop(0)
-
-            geo_monthly_return = 0.0
-            if raw_returns_window:
-                product_ret = 1.0
-                for r in raw_returns_window:
-                    product_ret *= 1 + r
-                geo_monthly_return = (product_ret ** (1 / len(raw_returns_window))) - 1
-
-            geo_benchmark_return = 0.0
-            if raw_benchmarks_window:
-                product_bench = 1.0
-                for r in raw_benchmarks_window:
-                    product_bench *= 1 + r
-                geo_benchmark_return = (
-                    product_bench ** (1 / len(raw_benchmarks_window))
-                ) - 1
-
-            geo_monthly_alpha = geo_monthly_return - geo_benchmark_return
-
-            gain_12m, xp_12m, _, _ = get_past_n_months_sums(month, 12)
-            fi_ratio_12m = 0.0
-            if xp_12m != 0:
-                fi_ratio_12m = gain_12m / xp_12m
-
-            gain_48m, xp_48m, _, _ = get_past_n_months_sums(month, 48)
-            fi_ratio_48m = 0.0
-            if xp_48m != 0:
-                fi_ratio_48m = gain_48m / xp_48m
-
-            expected_annual_return = EXPECTED_ANNUAL_RETURN
-            fi_ratio_next_12m = 0.0
-            if xp_12m != 0:
-                fi_ratio_next_12m = (bs.risk_assets * expected_annual_return) / xp_12m
-
-            metrics_list.append(
+            metrics.append(
                 FinancialMetrics(
                     month=Month(month),
                     savings_rate=savings_rate,
                     risk_asset_ratio=risk_ratio,
-                    monthly_return=geo_monthly_return,
-                    monthly_alpha=geo_monthly_alpha,
-                    benchmark_return=geo_benchmark_return,
-                    fi_ratio_12m=fi_ratio_12m,
-                    fi_ratio_48m=fi_ratio_48m,
-                    fi_ratio_next_12m=fi_ratio_next_12m,
+                    raw_monthly_return=raw_return,
+                    monthly_return=monthly_return,
+                    raw_benchmark_return=raw_benchmark,
+                    benchmark_return=benchmark_return,
+                    monthly_alpha=alpha,
+                    fi_ratio_12m=fi_12,
+                    fi_ratio_48m=fi_48,
+                    fi_ratio_next_12m=fi_next,
                 )
             )
 
-            if bs:
-                prev_bs = bs
-            if market:
-                prev_market = market
-
-        return metrics_list
+        return metrics
