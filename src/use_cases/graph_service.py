@@ -1,8 +1,10 @@
+from __future__ import annotations
+
 import os
 from dataclasses import dataclass, field
-from typing import Optional, cast
-
 from datetime import datetime
+from typing import Callable, Optional, cast
+
 import pandas as pd
 import plotly.graph_objects as go
 
@@ -11,16 +13,25 @@ CHART_COLORS = {
     "ink": "#13233f",
     "muted": "#788291",
     "gold": "#c99a3a",
-    "champagne": "#f1dfb5",
     "sage": "#738b73",
     "rose": "#b87460",
     "slate": "#7d8998",
 }
 
 
+def total_wealth_flow(df: pd.DataFrame) -> pd.Series:
+    """Return the flow that exactly reconciles the change in net worth."""
+    contribution = (
+        df["net_worth_contribution"]
+        if "net_worth_contribution" in df
+        else df["net_savings"]
+        + df.get("asset_contribution", pd.Series(0.0, index=df.index))
+    )
+    return contribution + df["investment_gain_loss"]
+
+
 @dataclass
 class GraphService:
-
     data_dir: str
     _csv_cache: dict[str, tuple[float, pd.DataFrame]] = field(default_factory=dict)
     _chart_cache: dict[tuple[str, Optional[int], Optional[int], float], str] = field(
@@ -28,12 +39,12 @@ class GraphService:
     )
 
     def warm_visible_cache(self) -> None:
-        visible_ranges = (
+        ranges = (
             {"months": 12, "forecast": None},
             {"months": None, "forecast": None},
             {"months": None, "forecast": 60},
         )
-        chart_builders = (
+        builders: tuple[Callable[..., str], ...] = (
             self.get_net_worth_chart,
             self.get_cashflow_chart,
             self.get_allocation_chart,
@@ -41,10 +52,9 @@ class GraphService:
             self.get_returns_chart,
             self.get_fi_chart,
         )
-
-        for range_args in visible_ranges:
-            for build_chart in chart_builders:
-                build_chart(**range_args)
+        for range_args in ranges:
+            for builder in builders:
+                builder(**range_args)
 
     def clear_cache(self) -> None:
         self._csv_cache.clear()
@@ -53,77 +63,10 @@ class GraphService:
     def _csv_path(self, filename: str) -> str:
         return os.path.join(self.data_dir, "data", "calculated", filename)
 
-    def _data_version(self, filename: str) -> float:
-        return os.path.getmtime(self._csv_path(filename))
-
     def _cache_key(
-        self, chart_name: str, months: Optional[int], forecast: Optional[int]
+        self, name: str, months: Optional[int], forecast: Optional[int]
     ) -> tuple[str, Optional[int], Optional[int], float]:
-        return (chart_name, months, forecast, self._data_version("forecast.csv"))
-
-    def _cached_chart(
-        self, chart_name: str, months: Optional[int], forecast: Optional[int]
-    ) -> str | None:
-        return self._chart_cache.get(self._cache_key(chart_name, months, forecast))
-
-    def _store_chart(
-        self,
-        chart_name: str,
-        months: Optional[int],
-        forecast: Optional[int],
-        html: str,
-    ) -> str:
-        self._chart_cache[self._cache_key(chart_name, months, forecast)] = html
-        return html
-
-    def _to_html(self, fig: go.Figure) -> str:
-        fig.update_layout(
-            font=dict(family="Manrope, Arial, sans-serif", color=CHART_COLORS["ink"]),
-            paper_bgcolor="rgba(0,0,0,0)",
-            plot_bgcolor="rgba(255,255,255,0)",
-            title=dict(
-                font=dict(
-                    family="Playfair Display, Georgia, serif",
-                    size=24,
-                    color=CHART_COLORS["navy"],
-                )
-            ),
-            hoverlabel=dict(
-                bgcolor="#ffffff",
-                bordercolor="rgba(201, 154, 58, 0.28)",
-                font=dict(color=CHART_COLORS["ink"]),
-            ),
-            xaxis=dict(
-                gridcolor="rgba(19, 35, 63, 0.06)",
-                linecolor="rgba(19, 35, 63, 0.12)",
-                tickfont=dict(color=CHART_COLORS["muted"]),
-                title_font=dict(color=CHART_COLORS["muted"]),
-                zerolinecolor="rgba(19, 35, 63, 0.08)",
-            ),
-            yaxis=dict(
-                gridcolor="rgba(19, 35, 63, 0.06)",
-                linecolor="rgba(19, 35, 63, 0.12)",
-                tickfont=dict(color=CHART_COLORS["muted"]),
-                title_font=dict(color=CHART_COLORS["muted"]),
-                zerolinecolor="rgba(19, 35, 63, 0.08)",
-            ),
-            legend=dict(
-                font=dict(color=CHART_COLORS["muted"], size=12),
-                bgcolor="rgba(255,255,255,0)",
-            ),
-        )
-        return cast(
-            str,
-            fig.to_html(
-                full_html=False,
-                include_plotlyjs=False,
-                default_width="100%",
-                config={
-                    "displayModeBar": False,
-                    "responsive": True,
-                },
-            ),
-        )
+        return (name, months, forecast, os.path.getmtime(self._csv_path("forecast.csv")))
 
     def _load_csv(self, filename: str) -> pd.DataFrame:
         path = self._csv_path(filename)
@@ -131,452 +74,151 @@ class GraphService:
         cached = self._csv_cache.get(filename)
         if cached and cached[0] == mtime:
             return cached[1]
+        frame = pd.read_csv(path)
+        self._csv_cache[filename] = (mtime, frame)
+        return frame
 
-        df = pd.read_csv(path)
-        self._csv_cache[filename] = (mtime, df)
-        return df
-
-    def _filter_data(
-        self, df: pd.DataFrame, months: Optional[int], forecast: Optional[int]
-    ) -> pd.DataFrame:
+    def _data(self, months: Optional[int], forecast: Optional[int]) -> pd.DataFrame:
+        frame = self._load_csv("forecast.csv")
         current = datetime.now().strftime("%Y-%m")
         if forecast:
-            start = (pd.to_datetime(current) - pd.DateOffset(months=12)).strftime(
-                "%Y-%m"
-            )
-            end = (pd.to_datetime(current) + pd.DateOffset(months=forecast)).strftime(
-                "%Y-%m"
-            )
-            return df[(df["month"] >= start) & (df["month"] <= end)]
-        if months:
-            return df[df["month"] <= current].tail(months)
-        return df[df["month"] <= current]
+            start = (pd.to_datetime(current) - pd.DateOffset(months=12)).strftime("%Y-%m")
+            end = (pd.to_datetime(current) + pd.DateOffset(months=forecast)).strftime("%Y-%m")
+            return frame[(frame["month"] >= start) & (frame["month"] <= end)]
+        actual = frame[frame["month"] <= current]
+        return actual.tail(months) if months else actual
+
+    def _to_html(self, figure: go.Figure) -> str:
+        figure.update_layout(
+            font=dict(family="Manrope, Arial, sans-serif", color=CHART_COLORS["ink"]),
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(255,255,255,0)",
+            hovermode="x unified",
+            template="plotly_white",
+            margin=dict(l=40, r=40, t=100, b=40),
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=1.05,
+                xanchor="right",
+                x=1,
+                font=dict(color=CHART_COLORS["muted"], size=12),
+            ),
+        )
+        return cast(
+            str,
+            figure.to_html(
+                full_html=False,
+                include_plotlyjs=False,
+                default_width="100%",
+                config={"displayModeBar": False, "responsive": True},
+            ),
+        )
+
+    def _cached(
+        self,
+        name: str,
+        months: Optional[int],
+        forecast: Optional[int],
+        builder: Callable[[pd.DataFrame], go.Figure],
+    ) -> str:
+        key = self._cache_key(name, months, forecast)
+        if key not in self._chart_cache:
+            self._chart_cache[key] = self._to_html(builder(self._data(months, forecast)))
+        return self._chart_cache[key]
 
     def get_net_worth_chart(
         self, months: Optional[int] = None, forecast: Optional[int] = None
     ) -> str:
-        cached = self._cached_chart("net_worth", months, forecast)
-        if cached is not None:
-            return cached
-
-        df = self._load_csv("forecast.csv")
-        df = self._filter_data(df, months, forecast)
-
-        fig = go.Figure()
-
-        # 合計値の計算
-        total = df["liquid_assets"] + df["risk_assets"] + df["pension_assets"]
-
-        fig.add_trace(
-            go.Bar(
-                x=df["month"],
-                y=df["liquid_assets"],
-                name="Liquid Assets",
-                marker_color="rgba(23, 35, 63, 0.88)",
-                hovertemplate="Liquid Assets: %{y:,.0f}万円<extra></extra>",
+        def build(df: pd.DataFrame) -> go.Figure:
+            figure = go.Figure()
+            for column, name, color in (
+                ("liquid_assets", "Liquid Assets", CHART_COLORS["navy"]),
+                ("risk_assets", "Risk Assets", CHART_COLORS["gold"]),
+                ("pension_assets", "Pension Assets", CHART_COLORS["sage"]),
+            ):
+                figure.add_bar(x=df["month"], y=df[column], name=name, marker_color=color)
+            figure.update_layout(
+                title="Net Worth Trend (万円)", barmode="stack", yaxis_title="Amount (万円)"
             )
-        )
+            return figure
 
-        fig.add_trace(
-            go.Bar(
-                x=df["month"],
-                y=df["risk_assets"],
-                name="Risk Assets",
-                marker_color="rgba(201, 154, 58, 0.82)",
-                hovertemplate="Risk Assets: %{y:,.0f}万円<extra></extra>",
-            )
-        )
-
-        fig.add_trace(
-            go.Bar(
-                x=df["month"],
-                y=df["pension_assets"],
-                name="Pension Assets",
-                marker_color="rgba(115, 139, 115, 0.78)",
-                hovertemplate="Pension Assets: %{y:,.0f}万円<extra></extra>",
-            )
-        )
-
-        # 合計を表示するための隠しトレース
-        fig.add_trace(
-            go.Scatter(
-                x=df["month"],
-                y=total,
-                name="TOTAL",
-                mode="lines",
-                line=dict(width=0),
-                hovertemplate="<b>TOTAL: %{y:,.0f}万円</b><extra></extra>",
-                showlegend=False,
-            )
-        )
-
-        fig.update_layout(
-            title=dict(text="Net Worth Trend (万円)", y=0.98, x=0.5, xanchor="center"),
-            xaxis_title="Month",
-            yaxis_title="Amount (万円)",
-            barmode="stack",
-            hovermode="x unified",
-            template="plotly_white",
-            margin=dict(l=40, r=40, t=100, b=40),
-            legend=dict(
-                orientation="h", yanchor="bottom", y=1.05, xanchor="right", x=1
-            ),
-        )
-
-        return self._store_chart("net_worth", months, forecast, self._to_html(fig))
+        return self._cached("net_worth", months, forecast, build)
 
     def get_cashflow_chart(
         self, months: Optional[int] = None, forecast: Optional[int] = None
     ) -> str:
-        cached = self._cached_chart("cashflow", months, forecast)
-        if cached is not None:
-            return cached
+        def build(df: pd.DataFrame) -> go.Figure:
+            figure = go.Figure()
+            figure.add_bar(x=df["month"], y=df["after_tax_income"], name="Income", marker_color=CHART_COLORS["sage"])
+            figure.add_bar(x=df["month"], y=-df["expenditure"], name="Expenses", marker_color=CHART_COLORS["rose"])
+            figure.add_bar(x=df["month"], y=df["investment_gain_loss"], name="Investment G/L", marker_color=CHART_COLORS["gold"])
+            flow = total_wealth_flow(df)
+            figure.add_scatter(x=df["month"], y=flow, name="Total Wealth Flow", mode="lines+markers", line=dict(color=CHART_COLORS["navy"], width=3))
+            figure.add_scatter(x=df["month"], y=flow.rolling(12, min_periods=1).mean(), name="Total Wealth Flow (12MA)", mode="lines", line=dict(color=CHART_COLORS["gold"], width=3, dash="dash"))
+            figure.update_layout(title="Monthly Cash Flow (万円)", barmode="relative", yaxis_title="Amount (万円)")
+            return figure
 
-        df = self._load_csv("forecast.csv")
-        df = self._filter_data(df, months, forecast)
-
-        income_12ma = df["after_tax_income"].rolling(window=12, min_periods=1).mean()
-
-        fig = go.Figure()
-
-        fig.add_trace(
-            go.Bar(
-                x=df["month"],
-                y=df["after_tax_income"],
-                name="Income",
-                marker_color="rgba(115, 139, 115, 0.8)",
-                hovertemplate="Income: %{y:,.1f}万円<extra></extra>",
-            )
-        )
-
-        fig.add_trace(
-            go.Scatter(
-                x=df["month"],
-                y=income_12ma,
-                name="Income (12MA)",
-                mode="lines",
-                line=dict(color=CHART_COLORS["sage"], width=3, dash="dash"),
-                hovertemplate="Income (12MA): %{y:,.1f}万円<extra></extra>",
-            )
-        )
-
-        fig.add_trace(
-            go.Bar(
-                x=df["month"],
-                y=-df["expenditure"],
-                name="Expenses",
-                marker_color="rgba(184, 116, 96, 0.74)",
-                hovertemplate="Expenses: %{y:,.1f}万円<extra></extra>",
-            )
-        )
-
-        fig.add_trace(
-            go.Bar(
-                x=df["month"],
-                y=df["investment_gain_loss"],
-                name="Investment G/L",
-                marker_color="rgba(201, 154, 58, 0.76)",
-                hovertemplate="Inv G/L: %{y:,.1f}万円<extra></extra>",
-            )
-        )
-
-        total_flow = df["net_savings"] + df["investment_gain_loss"]
-        total_flow_12ma = total_flow.rolling(window=12, min_periods=1).mean()
-
-        fig.add_trace(
-            go.Scatter(
-                x=df["month"],
-                y=total_flow,
-                name="Total Flow",
-                mode="lines+markers",
-                line=dict(color=CHART_COLORS["navy"], width=3),
-                marker=dict(size=7, color=CHART_COLORS["navy"]),
-                hovertemplate="<b>Total Flow: %{y:,.1f}万円</b><extra></extra>",
-            )
-        )
-
-        fig.add_trace(
-            go.Scatter(
-                x=df["month"],
-                y=total_flow_12ma,
-                name="Total Flow (12MA)",
-                mode="lines",
-                line=dict(color=CHART_COLORS["gold"], width=3, dash="dash"),
-                hovertemplate="Flow (12MA): %{y:,.1f}万円<extra></extra>",
-            )
-        )
-
-        fig.update_layout(
-            title=dict(
-                text="Monthly Cash Flow (万円)", y=0.98, x=0.5, xanchor="center"
-            ),
-            xaxis_title="Month",
-            yaxis_title="Amount (万円)",
-            barmode="relative",
-            hovermode="x unified",
-            template="plotly_white",
-            margin=dict(l=40, r=40, t=100, b=40),
-            legend=dict(
-                orientation="h", yanchor="bottom", y=1.05, xanchor="right", x=1
-            ),
-        )
-
-        return self._store_chart("cashflow", months, forecast, self._to_html(fig))
+        return self._cached("cashflow", months, forecast, build)
 
     def get_allocation_chart(
         self, months: Optional[int] = None, forecast: Optional[int] = None
     ) -> str:
-        cached = self._cached_chart("allocation", months, forecast)
-        if cached is not None:
-            return cached
+        def build(df: pd.DataFrame) -> go.Figure:
+            total = df[["liquid_assets", "risk_assets", "pension_assets"]].sum(axis=1)
+            denominator = total.where(total != 0)
+            figure = go.Figure()
+            for column, name, color in (
+                ("liquid_assets", "Liquid Assets", CHART_COLORS["navy"]),
+                ("risk_assets", "Risk Assets", CHART_COLORS["gold"]),
+                ("pension_assets", "Pension Assets", CHART_COLORS["sage"]),
+            ):
+                figure.add_bar(x=df["month"], y=df[column] / denominator * 100, name=name, marker_color=color)
+            figure.update_layout(title="Asset Allocation (%)", barmode="stack", yaxis=dict(title="Ratio (%)", range=[0, 100]))
+            return figure
 
-        df = self._load_csv("forecast.csv")
-        df = self._filter_data(df, months, forecast)
-
-        total = df["liquid_assets"] + df["risk_assets"] + df["pension_assets"]
-        liquid_pct = df["liquid_assets"] / total * 100
-        risk_pct = df["risk_assets"] / total * 100
-        pension_pct = df["pension_assets"] / total * 100
-
-        fig = go.Figure()
-
-        fig.add_trace(
-            go.Bar(
-                x=df["month"],
-                y=liquid_pct,
-                name="Liquid Assets",
-                marker_color="rgba(23, 35, 63, 0.88)",
-                hovertemplate="Liquid: %{y:.1f}%<extra></extra>",
-            )
-        )
-
-        fig.add_trace(
-            go.Bar(
-                x=df["month"],
-                y=risk_pct,
-                name="Risk Assets",
-                marker_color="rgba(201, 154, 58, 0.82)",
-                hovertemplate="Risk: %{y:.1f}%<extra></extra>",
-            )
-        )
-
-        fig.add_trace(
-            go.Bar(
-                x=df["month"],
-                y=pension_pct,
-                name="Pension Assets",
-                marker_color="rgba(115, 139, 115, 0.78)",
-                hovertemplate="Pension: %{y:.1f}%<extra></extra>",
-            )
-        )
-
-        fig.update_layout(
-            title=dict(text="Asset Allocation (%)", y=0.98, x=0.5, xanchor="center"),
-            xaxis_title="Month",
-            yaxis_title="Ratio (%)",
-            barmode="stack",
-            hovermode="x unified",
-            template="plotly_white",
-            margin=dict(l=40, r=40, t=100, b=40),
-            legend=dict(
-                orientation="h", yanchor="bottom", y=1.05, xanchor="right", x=1
-            ),
-            yaxis=dict(range=[0, 100]),
-        )
-
-        return self._store_chart("allocation", months, forecast, self._to_html(fig))
+        return self._cached("allocation", months, forecast, build)
 
     def get_ratios_chart(
         self, months: Optional[int] = None, forecast: Optional[int] = None
     ) -> str:
-        cached = self._cached_chart("ratios", months, forecast)
-        if cached is not None:
-            return cached
+        def build(df: pd.DataFrame) -> go.Figure:
+            figure = go.Figure()
+            figure.add_scatter(x=df["month"], y=df["savings_rate"] * 100, name="Savings Rate (%)", mode="lines+markers", line=dict(color=CHART_COLORS["navy"], width=3))
+            figure.add_scatter(x=df["month"], y=df["risk_asset_ratio"] * 100, name="Invested Asset Ratio (%)", mode="lines+markers", line=dict(color=CHART_COLORS["gold"], width=3))
+            figure.update_layout(title="Financial Ratios (%)", yaxis_title="Ratio (%)")
+            return figure
 
-        df = self._load_csv("forecast.csv")
-        df = self._filter_data(df, months, forecast)
-
-        fig = go.Figure()
-
-        fig.add_trace(
-            go.Scatter(
-                x=df["month"],
-                y=df["savings_rate"] * 100,
-                name="Savings Rate (%)",
-                mode="lines+markers",
-                line=dict(color=CHART_COLORS["navy"], width=3),
-                marker=dict(size=7, color=CHART_COLORS["navy"]),
-                hovertemplate="Savings Rate: %{y:.1f}%<extra></extra>",
-            )
-        )
-
-        fig.add_trace(
-            go.Scatter(
-                x=df["month"],
-                y=df["risk_asset_ratio"] * 100,
-                name="Risk Asset Ratio (%)",
-                mode="lines+markers",
-                line=dict(color=CHART_COLORS["gold"], width=3),
-                marker=dict(size=7, color=CHART_COLORS["gold"]),
-                hovertemplate="Risk Asset Ratio: %{y:.1f}%<extra></extra>",
-            )
-        )
-
-        fig.update_layout(
-            title=dict(text="Financial Ratios (%)", y=0.98, x=0.5, xanchor="center"),
-            hovermode="x unified",
-            template="plotly_white",
-            margin=dict(l=40, r=40, t=100, b=40),
-            legend=dict(
-                orientation="h", yanchor="bottom", y=1.05, xanchor="right", x=1
-            ),
-            yaxis=dict(title="Ratio (%)"),
-        )
-
-        return self._store_chart("ratios", months, forecast, self._to_html(fig))
+        return self._cached("ratios", months, forecast, build)
 
     def get_returns_chart(
         self, months: Optional[int] = None, forecast: Optional[int] = None
     ) -> str:
-        cached = self._cached_chart("returns", months, forecast)
-        if cached is not None:
-            return cached
+        def build(df: pd.DataFrame) -> go.Figure:
+            figure = go.Figure()
+            for column, name, color, dash in (
+                ("monthly_return", "Portfolio Return (%)", CHART_COLORS["navy"], None),
+                ("benchmark_return", "Benchmark Return (%)", CHART_COLORS["slate"], "dot"),
+                ("monthly_alpha", "Alpha (%)", CHART_COLORS["gold"], None),
+            ):
+                figure.add_scatter(x=df["month"], y=df[column] * 100, name=name, mode="lines+markers", line=dict(color=color, width=3, dash=dash))
+            figure.update_layout(title="Investment Performance (%)", yaxis_title="Return (%)")
+            return figure
 
-        df = self._load_csv("forecast.csv")
-        df = self._filter_data(df, months, forecast)
-
-        fig = go.Figure()
-
-        fig.add_trace(
-            go.Scatter(
-                x=df["month"],
-                y=df["monthly_return"] * 100,
-                name="Monthly Return (%)",
-                mode="lines+markers",
-                line=dict(color=CHART_COLORS["navy"], width=3),
-                marker=dict(size=7, color=CHART_COLORS["navy"]),
-                hovertemplate="My Return: %{y:.2f}%<extra></extra>",
-            )
-        )
-
-        fig.add_trace(
-            go.Scatter(
-                x=df["month"],
-                y=df["benchmark_return"] * 100,
-                name="Benchmark Return (%)",
-                mode="lines+markers",
-                line=dict(color=CHART_COLORS["slate"], width=2, dash="dot"),
-                marker=dict(size=6, color=CHART_COLORS["slate"]),
-                hovertemplate="Benchmark: %{y:.2f}%<extra></extra>",
-            )
-        )
-
-        fig.add_trace(
-            go.Scatter(
-                x=df["month"],
-                y=df["monthly_alpha"] * 100,
-                name="Alpha (%)",
-                mode="lines+markers",
-                line=dict(color=CHART_COLORS["gold"], width=3),
-                marker=dict(size=7, color=CHART_COLORS["gold"]),
-                hovertemplate="Alpha: %{y:.2f}%<extra></extra>",
-            )
-        )
-
-        fig.update_layout(
-            title=dict(
-                text="Investment Performance (%)", y=0.98, x=0.5, xanchor="center"
-            ),
-            hovermode="x unified",
-            template="plotly_white",
-            margin=dict(l=40, r=40, t=100, b=40),
-            legend=dict(
-                orientation="h", yanchor="bottom", y=1.05, xanchor="right", x=1
-            ),
-            yaxis=dict(title="Return (%)"),
-        )
-
-        return self._store_chart("returns", months, forecast, self._to_html(fig))
+        return self._cached("returns", months, forecast, build)
 
     def get_fi_chart(
         self, months: Optional[int] = None, forecast: Optional[int] = None
     ) -> str:
-        cached = self._cached_chart("fi", months, forecast)
-        if cached is not None:
-            return cached
+        def build(df: pd.DataFrame) -> go.Figure:
+            figure = go.Figure()
+            for column, name, color, dash in (
+                ("fi_ratio_12m", "FI Ratio (12m)", CHART_COLORS["navy"], None),
+                ("fi_ratio_48m", "FI Ratio (48m)", CHART_COLORS["sage"], None),
+                ("fi_ratio_next_12m", "FI Ratio (Projected)", CHART_COLORS["gold"], "dot"),
+            ):
+                figure.add_scatter(x=df["month"], y=df[column], name=name, mode="lines+markers", line=dict(color=color, width=3, dash=dash))
+            figure.update_layout(title="Financial Independence Ratio", yaxis_title="Ratio (x Expenses)")
+            return figure
 
-        df = self._load_csv("forecast.csv")
-        df = self._filter_data(df, months, forecast)
-
-        fig = go.Figure()
-
-        fig.add_trace(
-            go.Scatter(
-                x=df["month"],
-                y=df["fi_ratio_12m"],
-                name="FI Ratio (12m)",
-                mode="lines+markers",
-                line=dict(color=CHART_COLORS["navy"], width=3),
-                marker=dict(size=7, color=CHART_COLORS["navy"]),
-                hovertemplate="FI Ratio (12m): %{y:.2f}x<extra></extra>",
-            )
-        )
-
-        fig.add_trace(
-            go.Scatter(
-                x=df["month"],
-                y=df["fi_ratio_48m"],
-                name="FI Ratio (48m)",
-                mode="lines+markers",
-                line=dict(color=CHART_COLORS["sage"], width=3),
-                marker=dict(size=7, color=CHART_COLORS["sage"]),
-                hovertemplate="FI Ratio (48m): %{y:.2f}x<extra></extra>",
-            )
-        )
-
-        fig.add_trace(
-            go.Scatter(
-                x=df["month"],
-                y=df["fi_ratio_next_12m"],
-                name="FI Ratio (Proj)",
-                mode="lines+markers",
-                line=dict(color=CHART_COLORS["gold"], width=3, dash="dot"),
-                marker=dict(size=7, color=CHART_COLORS["gold"]),
-                hovertemplate="FI Ratio (Proj): %{y:.2f}x<extra></extra>",
-            )
-        )
-
-        fig.update_layout(
-            title=dict(
-                text="Financial Independence Ratio (Years Covered)",
-                y=0.98,
-                x=0.5,
-                xanchor="center",
-            ),
-            hovermode="x unified",
-            template="plotly_white",
-            margin=dict(l=40, r=40, t=100, b=40),
-            legend=dict(
-                orientation="h", yanchor="bottom", y=1.05, xanchor="right", x=1
-            ),
-            yaxis=dict(title="Ratio (x Expenses)"),
-            shapes=[
-                dict(
-                    type="line",
-                    yref="y",
-                    y0=1.0,
-                    y1=1.0,
-                    xref="paper",
-                    x0=0,
-                    x1=1,
-                    line=dict(
-                        color="rgba(184, 116, 96, 0.58)",
-                        width=2,
-                        dash="dashdot",
-                    ),
-                    name="FIRE Target (100%)",
-                )
-            ],
-        )
-
-        return self._store_chart("fi", months, forecast, self._to_html(fig))
+        return self._cached("fi", months, forecast, build)
