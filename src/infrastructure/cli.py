@@ -1,15 +1,17 @@
 import os
+
 import pandas as pd
 from injector import Injector
-from src.infrastructure.di.container import AppModule
+
 from src.domain.repositories.interfaces import (
-    ITransactionRepository,
     IAssetRepository,
     IMarketRepository,
     IMasterRepository,
+    ITransactionRepository,
 )
-from src.use_cases.calculators.cash_flow import CashFlowCalculator
+from src.infrastructure.di.container import AppModule
 from src.use_cases.calculators.balance_sheet import BalanceSheetCalculator
+from src.use_cases.calculators.cash_flow import CashFlowCalculator
 from src.use_cases.calculators.metrics import MetricsCalculator
 
 
@@ -26,7 +28,6 @@ def main() -> None:
     bs_calculator = injector.get(BalanceSheetCalculator)
     metrics_calculator = injector.get(MetricsCalculator)
 
-    print("Loading data...")
     incomes = transaction_repo.get_incomes()
     expenses = transaction_repo.get_expenses()
     assets = asset_repo.get_assets()
@@ -34,70 +35,62 @@ def main() -> None:
     accounts = master_repo.get_accounts()
     asset_classes = master_repo.get_asset_classes()
 
-    print("Calculating Cash Flow...")
-    cf_statements = cf_calculator.calculate(incomes, expenses, accounts)
-
-    print("Calculating Balance Sheet...")
-    bs_statements = bs_calculator.calculate(
-        assets, markets, accounts, cf_statements, asset_classes
+    cashflows = cf_calculator.calculate(incomes, expenses, accounts)
+    balance_sheets = bs_calculator.calculate(
+        assets, markets, accounts, cashflows, asset_classes
     )
-
-    print("Calculating Metrics...")
-    metrics = metrics_calculator.calculate(cf_statements, bs_statements, markets)
+    metrics = metrics_calculator.calculate(cashflows, balance_sheets, markets)
 
     output_dir = os.path.join(root_dir, "data", "calculated")
     os.makedirs(output_dir, exist_ok=True)
 
-    cf_data = []
-    for cf in cf_statements:
-        cf_data.append(
+    pd.DataFrame(
+        [
             {
-                "month": cf.month,
-                "after_tax_income": cf.after_tax_income / 10000,
-                "expenditure": cf.expenditure / 10000,
-                "net_savings": cf.net_savings / 10000,
-                "asset_contribution": cf.asset_contribution / 10000,
-                "net_worth_contribution": cf.net_worth_contribution / 10000,
+                "month": item.month,
+                "after_tax_income": item.after_tax_income / 10000,
+                "expenditure": item.expenditure / 10000,
+                "net_savings": item.net_savings / 10000,
+                "asset_contribution": item.asset_contribution / 10000,
+                "net_worth_contribution": item.net_worth_contribution / 10000,
             }
-        )
-    pd.DataFrame(cf_data).to_csv(
-        os.path.join(output_dir, "cashflow.csv"), index=False, float_format="%.4g"
-    )
+            for item in cashflows
+        ]
+    ).to_csv(os.path.join(output_dir, "cashflow.csv"), index=False)
 
-    bs_data = []
-    for bs in bs_statements:
-        bs_data.append(
+    pd.DataFrame(
+        [
             {
-                "month": bs.month,
-                "liquid_assets": bs.liquid_assets / 10000,
-                "risk_assets": bs.risk_assets / 10000,
-                "pension_assets": bs.pension_assets / 10000,
-                "total_financial_assets": bs.total_financial_assets / 10000,
-                "investment_gain_loss": bs.investment_gain_loss / 10000,
+                "month": item.month,
+                "liquid_assets": item.liquid_assets / 10000,
+                "risk_assets": item.risk_assets / 10000,
+                "pension_assets": item.pension_assets / 10000,
+                "total_financial_assets": item.total_financial_assets / 10000,
+                "investment_gain_loss": item.investment_gain_loss / 10000,
+                "return_base_assets": item.return_base_assets / 10000,
             }
-        )
-    pd.DataFrame(bs_data).to_csv(
-        os.path.join(output_dir, "balance_sheet.csv"), index=False, float_format="%.4g"
-    )
+            for item in balance_sheets
+        ]
+    ).to_csv(os.path.join(output_dir, "balance_sheet.csv"), index=False)
 
-    metrics_data = []
-    for m in metrics:
-        metrics_data.append(
+    pd.DataFrame(
+        [
             {
-                "month": m.month,
-                "savings_rate": m.savings_rate,
-                "risk_asset_ratio": m.risk_asset_ratio,
-                "monthly_return": m.monthly_return,
-                "monthly_alpha": m.monthly_alpha,
-                "benchmark_return": m.benchmark_return,
-                "fi_ratio_12m": m.fi_ratio_12m,
-                "fi_ratio_48m": m.fi_ratio_48m,
-                "fi_ratio_next_12m": m.fi_ratio_next_12m,
+                "month": item.month,
+                "savings_rate": item.savings_rate,
+                "risk_asset_ratio": item.risk_asset_ratio,
+                "raw_monthly_return": item.raw_monthly_return,
+                "monthly_return": item.monthly_return,
+                "raw_benchmark_return": item.raw_benchmark_return,
+                "benchmark_return": item.benchmark_return,
+                "monthly_alpha": item.monthly_alpha,
+                "fi_ratio_12m": item.fi_ratio_12m,
+                "fi_ratio_48m": item.fi_ratio_48m,
+                "fi_ratio_next_12m": item.fi_ratio_next_12m,
             }
-        )
-    pd.DataFrame(metrics_data).to_csv(
-        os.path.join(output_dir, "metrics.csv"), index=False, float_format="%.4g"
-    )
+            for item in metrics
+        ]
+    ).to_csv(os.path.join(output_dir, "metrics.csv"), index=False)
 
     print(f"Successfully exported to {output_dir}")
 

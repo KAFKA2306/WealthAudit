@@ -1,9 +1,10 @@
-from bisect import bisect_right
-from typing import List, Dict, Optional
 from collections import defaultdict
-from src.domain.entities.models import Asset, Market, Account, AssetClass, Month
-from src.constants import AccountId, AccountType, AssetClassId, Currency
+from typing import Dict, List, Optional
+
+from src.constants import AccountId, AccountType, AssetClassId
+from src.domain.entities.models import Account, Asset, AssetClass, Market, Month
 from src.use_cases.dtos.output import BalanceSheet, CashFlowStatement
+from src.use_cases.valuation import is_consecutive_month, value_assets
 
 
 class BalanceSheetCalculator:
@@ -15,127 +16,74 @@ class BalanceSheetCalculator:
         cashflows: List[CashFlowStatement],
         asset_classes: Optional[List[AssetClass]] = None,
     ) -> List[BalanceSheet]:
-        account_map: Dict[AccountId, Account] = {acc.id: acc for acc in accounts}
-        asset_class_map: Dict[AssetClassId, AssetClass] = {
+        account_map: Dict[AccountId, Account] = {
+            account.id: account for account in accounts
+        }
+        class_map = {
             asset_class.id: asset_class for asset_class in asset_classes or []
         }
+        cf_map = {str(statement.month): statement for statement in cashflows}
 
-        market_map: Dict[str, Market] = {m.month: m for m in markets}
-        market_cache = sorted(markets, key=lambda m: m.month)
-        market_months = [m.month for m in market_cache]
-
-        cf_map: Dict[str, CashFlowStatement] = {cf.month: cf for cf in cashflows}
-
-        assets_by_month: Dict[str, List[Asset]] = defaultdict(list)
+        assets_by_month: dict[str, list[Asset]] = defaultdict(list)
         for asset in assets:
-            assets_by_month[asset.month].append(asset)
+            assets_by_month[str(asset.month)].append(asset)
 
-        sorted_months = sorted(
-            list(set(assets_by_month.keys()) | set(market_map.keys()))
-        )
+        statements: list[BalanceSheet] = []
+        previous_statement: BalanceSheet | None = None
 
-        bs_list: List[BalanceSheet] = []
-        prev_total_assets = 0.0
-
-        for month in sorted_months:
-            if month not in assets_by_month:
-                continue
-
-            current_assets = assets_by_month[month]
-            market = self._market_for_month(month, market_cache, market_months)
-
+        for month in sorted(assets_by_month):
+            valuations = value_assets(assets_by_month[month], markets, accounts)
             liquid_total = 0.0
             risk_total = 0.0
             pension_total = 0.0
 
-            for asset in current_assets:
-                acc = account_map.get(asset.account_id)
-                if not acc:
-                    continue
-
-                rate = self._conversion_rate(asset, acc, market, bool(market_cache))
-                jpy_balance = asset.balance * rate
-
-                asset_class = asset_class_map.get(asset.asset_class)
+            for valuation in valuations:
+                account = account_map[valuation.account_id]
+                asset_class = class_map.get(valuation.asset_class)
                 if (
-                    acc.type == AccountType.PENSION
-                    or asset.asset_class == AssetClassId.PENSION
+                    account.type == AccountType.PENSION
+                    or valuation.asset_class == AssetClassId.PENSION
                 ):
-                    pension_total += jpy_balance
-                elif asset_class and asset_class.risk_level == 1:
-                    risk_total += jpy_balance
-                elif asset_class and asset_class.risk_level == 0:
-                    liquid_total += jpy_balance
-                elif acc.risk == 1:
-                    risk_total += jpy_balance
+                    pension_total += valuation.jpy_value
+                elif asset_class is not None:
+                    if asset_class.risk_level == 1:
+                        risk_total += valuation.jpy_value
+                    else:
+                        liquid_total += valuation.jpy_value
+                elif account.risk == 1:
+                    risk_total += valuation.jpy_value
                 else:
-                    liquid_total += jpy_balance
+                    liquid_total += valuation.jpy_value
 
             total_assets = liquid_total + risk_total + pension_total
+            cashflow = cf_map.get(month)
+            contribution = cashflow.net_worth_contribution if cashflow else 0
 
-            cf = cf_map.get(month)
-            net_worth_contribution = cf.net_worth_contribution if cf else 0.0
-
-            if not bs_list:
-                investment_gain = 0.0
-            else:
-                investment_gain = (
-                    total_assets - prev_total_assets - net_worth_contribution
+            gain = 0.0
+            return_base_assets = 0.0
+            if previous_statement is not None and is_consecutive_month(
+                str(previous_statement.month), month
+            ):
+                gain = (
+                    total_assets
+                    - previous_statement.total_financial_assets
+                    - contribution
+                )
+                return_base_assets = (
+                    previous_statement.risk_assets
+                    + previous_statement.pension_assets
                 )
 
-            bs_list.append(
-                BalanceSheet(
-                    month=Month(month),
-                    liquid_assets=int(liquid_total),
-                    risk_assets=int(risk_total),
-                    pension_assets=int(pension_total),
-                    total_financial_assets=int(total_assets),
-                    investment_gain_loss=int(investment_gain),
-                )
+            statement = BalanceSheet(
+                month=Month(month),
+                liquid_assets=round(liquid_total),
+                risk_assets=round(risk_total),
+                pension_assets=round(pension_total),
+                total_financial_assets=round(total_assets),
+                investment_gain_loss=round(gain),
+                return_base_assets=round(return_base_assets),
             )
+            statements.append(statement)
+            previous_statement = statement
 
-            prev_total_assets = total_assets
-
-        return bs_list
-
-    def _market_for_month(
-        self,
-        month: str,
-        market_cache: List[Market],
-        market_months: List[str],
-    ) -> Optional[Market]:
-        if not market_cache:
-            return None
-
-        prior_index = bisect_right(market_months, month) - 1
-        if prior_index >= 0:
-            return market_cache[prior_index]
-        return market_cache[0]
-
-    def _conversion_rate(
-        self,
-        asset: Asset,
-        account: Account,
-        market: Optional[Market],
-        has_market_data: bool,
-    ) -> float:
-        if account.currency == Currency.JPY:
-            return 1.0
-
-        if not has_market_data or market is None:
-            raise ValueError(
-                "Market data is required to convert "
-                f"{account.currency.value} asset "
-                f"{asset.account_id.value}/{asset.asset_class.value} "
-                f"in {asset.month}."
-            )
-
-        if account.currency == Currency.USD:
-            return market.usd_jpy
-        if account.currency == Currency.EUR:
-            return market.eur_jpy
-
-        raise ValueError(
-            f"Unsupported foreign currency {account.currency.value} "
-            f"for {asset.account_id.value}/{asset.asset_class.value}."
-        )
+        return statements
