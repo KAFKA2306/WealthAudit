@@ -27,7 +27,7 @@ def create_app() -> Flask:
     def warm_graph_cache() -> None:
         try:
             graph_service.warm_visible_cache()
-        except Exception as exc:
+        except Exception as exc:  # data may not exist during first setup
             app.logger.info("Skipping graph cache warmup: %s", exc)
 
     warm_graph_cache()
@@ -36,19 +36,32 @@ def create_app() -> Flask:
         path = input_dir / filename
         return pd.read_csv(path) if path.exists() else pd.DataFrame()
 
-    def replace_month(filename: str, target_month: str | None, rows: list[dict[str, Any]], columns: list[str]) -> pd.DataFrame | None:
+    def replace_month(
+        filename: str,
+        target_month: str | None,
+        rows: list[dict[str, Any]],
+        columns: list[str],
+    ) -> pd.DataFrame | None:
         if not rows:
             return None
         current = load_csv(filename)
         new_frame = pd.DataFrame(rows, columns=columns)
-        current = pd.DataFrame(columns=columns) if current.empty else current[current["month"] != target_month]
+        if current.empty:
+            current = pd.DataFrame(columns=columns)
+        else:
+            current = current[current["month"] != target_month]
         return pd.concat([current, new_frame], ignore_index=True)
 
-    def write_staged_inputs(updates: dict[str, pd.DataFrame], temp_root: Path) -> Path | None:
+    def write_staged_inputs(
+        updates: dict[str, pd.DataFrame], temp_root: Path
+    ) -> Path | None:
         if not updates:
             return None
         staged = temp_root / "input"
-        shutil.copytree(input_dir, staged) if input_dir.exists() else staged.mkdir(parents=True)
+        if input_dir.exists():
+            shutil.copytree(input_dir, staged)
+        else:
+            staged.mkdir(parents=True)
         for filename, frame in updates.items():
             frame.to_csv(staged / filename, index=False)
         return staged
@@ -77,10 +90,11 @@ def create_app() -> Flask:
         return backup
 
     def restore_inputs(backup: Path | None) -> None:
-        if backup is not None:
-            if input_dir.exists():
-                shutil.rmtree(input_dir)
-            backup.rename(input_dir)
+        if backup is None:
+            return
+        if input_dir.exists():
+            shutil.rmtree(input_dir)
+        backup.rename(input_dir)
 
     def run_recalculation() -> None:
         for task in ("run", "export", "forecast"):
@@ -101,12 +115,18 @@ def create_app() -> Flask:
             target_month = request.form.get("target_month")
             new_income = [
                 {"month": target_month, "account_id": account, "amount": int(amount)}
-                for account, amount in zip(request.form.getlist("income_account[]"), request.form.getlist("income_amount[]"))
+                for account, amount in zip(
+                    request.form.getlist("income_account[]"),
+                    request.form.getlist("income_amount[]"),
+                )
                 if account and amount
             ]
             new_expenses = [
                 {"month": target_month, "method_id": method, "amount": int(amount)}
-                for method, amount in zip(request.form.getlist("expense_method[]"), request.form.getlist("expense_amount[]"))
+                for method, amount in zip(
+                    request.form.getlist("expense_method[]"),
+                    request.form.getlist("expense_amount[]"),
+                )
                 if method and amount
             ]
 
@@ -115,18 +135,33 @@ def create_app() -> Flask:
             asset_balances = request.form.getlist("asset_balance[]")
             asset_currencies = request.form.getlist("asset_currency[]")
             asset_currencies += [""] * (len(asset_accounts) - len(asset_currencies))
-            account_currency = dict(zip(accounts["account_id"], accounts["currency"])) if not accounts.empty and "currency" in accounts else {}
+            account_currency = (
+                dict(zip(accounts["account_id"], accounts["currency"]))
+                if not accounts.empty and "currency" in accounts
+                else {}
+            )
             existing_assets = load_csv("assets.csv")
-            balance_column = "native_balance" if "native_balance" in existing_assets.columns else "balance"
+            balance_column = (
+                "native_balance"
+                if "native_balance" in existing_assets.columns
+                else "balance"
+            )
             include_currency = "native_currency" in existing_assets.columns
             new_assets: list[dict[str, Any]] = []
-            for account, asset_class, balance, currency in zip(asset_accounts, asset_classes, asset_balances, asset_currencies):
+            for account, asset_class, balance, currency in zip(
+                asset_accounts, asset_classes, asset_balances, asset_currencies
+            ):
                 if not (account and asset_class and balance):
                     continue
                 configured_currency = str(account_currency.get(account, ""))
-                resolved_currency = currency.strip() or (configured_currency if configured_currency != "multi" else "")
+                resolved_currency = currency.strip() or (
+                    configured_currency if configured_currency != "multi" else ""
+                )
                 if configured_currency == "multi" and not resolved_currency:
-                    return f"native_currency is required for multi-currency account {account}", 400
+                    return (
+                        f"native_currency is required for multi-currency account {account}",
+                        400,
+                    )
                 row: dict[str, Any] = {
                     "month": target_month,
                     "account_id": account,
@@ -144,9 +179,15 @@ def create_app() -> Flask:
             updates = {
                 filename: frame
                 for filename, frame in {
-                    "income.csv": replace_month("income.csv", target_month, new_income, ["month", "account_id", "amount"]),
-                    "expense.csv": replace_month("expense.csv", target_month, new_expenses, ["month", "method_id", "amount"]),
-                    "assets.csv": replace_month("assets.csv", target_month, new_assets, asset_columns),
+                    "income.csv": replace_month(
+                        "income.csv", target_month, new_income, ["month", "account_id", "amount"]
+                    ),
+                    "expense.csv": replace_month(
+                        "expense.csv", target_month, new_expenses, ["month", "method_id", "amount"]
+                    ),
+                    "assets.csv": replace_month(
+                        "assets.csv", target_month, new_assets, asset_columns
+                    ),
                 }.items()
                 if frame is not None
             }
@@ -162,7 +203,11 @@ def create_app() -> Flask:
                     restore_inputs(backup)
                     restore_calculated(calculated_snapshot)
                     graph_service.clear_cache()
-                    return "Recalculation failed. Input CSV files were restored; " f"failed command: {' '.join(exc.cmd)}", 500
+                    return (
+                        "Recalculation failed. Input CSV files were restored; "
+                        f"failed command: {' '.join(exc.cmd)}",
+                        500,
+                    )
                 else:
                     if backup is not None and backup.exists():
                         shutil.rmtree(backup)
@@ -180,12 +225,24 @@ def create_app() -> Flask:
             last_date = datetime.datetime.strptime(str(income["month"].iloc[-1]), "%Y-%m")
             target_month = (last_date + relativedelta(months=1)).strftime("%Y-%m")
 
-        account_names = dict(zip(accounts["account_id"], accounts["name"])) if not accounts.empty else {}
-        account_currencies = dict(zip(accounts["account_id"], accounts["currency"])) if not accounts.empty and "currency" in accounts else {}
+        account_names = (
+            dict(zip(accounts["account_id"], accounts["name"]))
+            if not accounts.empty
+            else {}
+        )
+        account_currencies = (
+            dict(zip(accounts["account_id"], accounts["currency"]))
+            if not accounts.empty and "currency" in accounts
+            else {}
+        )
         recent_months = sorted(income["month"].unique())[-6:] if not income.empty else []
         recent_income = income[income["month"].isin(recent_months)] if recent_months else income
         income_items = [
-            {"account_id": account, "name": account_names.get(account, account), "suggested_amount": int(group["amount"].mean())}
+            {
+                "account_id": account,
+                "name": account_names.get(account, account),
+                "suggested_amount": int(group["amount"].mean()),
+            }
             for account, group in recent_income.groupby("account_id")
         ] if not recent_income.empty else []
 
@@ -198,7 +255,11 @@ def create_app() -> Flask:
             recent_expense = expense[expense["month"].isin(recent_expense_months)] if recent_expense_months else expense
             for _, method in methods.iterrows():
                 values = recent_expense[recent_expense["method_id"] == method["method_id"]]
-                item = {"method_id": method["method_id"], "name": method["name"], "suggested_amount": int(values["amount"].mean()) if not values.empty else 0}
+                item = {
+                    "method_id": method["method_id"],
+                    "name": method["name"],
+                    "suggested_amount": int(values["amount"].mean()) if not values.empty else 0,
+                }
                 settlement_day = int(method.get("settlement_day", 0) or 0)
                 (card_items if settlement_day >= 1 else other_expense_items).append(item)
 
@@ -211,27 +272,40 @@ def create_app() -> Flask:
             if "native_currency" in latest:
                 group_columns.append("native_currency")
             latest = latest.groupby(group_columns, dropna=False, as_index=False)[balance_column].sum()
-            recent_assets = assets[assets["month"].isin(sorted(assets["month"].unique())[-6:])]
+            recent_asset_months = sorted(assets["month"].unique())[-6:]
+            recent_assets = assets[assets["month"].isin(recent_asset_months)]
             for _, row in latest.iterrows():
                 account_id = str(row["account_id"])
                 row_currency = row.get("native_currency", "")
-                currency = str(row_currency) if pd.notna(row_currency) and str(row_currency) else str(account_currencies.get(account_id, ""))
-                history = recent_assets[(recent_assets["account_id"] == account_id) & (recent_assets["asset_class"] == row["asset_class"])]
+                currency = (
+                    str(row_currency)
+                    if pd.notna(row_currency) and str(row_currency)
+                    else str(account_currencies.get(account_id, ""))
+                )
+                history = recent_assets[
+                    (recent_assets["account_id"] == account_id)
+                    & (recent_assets["asset_class"] == row["asset_class"])
+                ]
                 if "native_currency" in history and currency and currency != "multi":
-                    history = history[history["native_currency"].fillna(currency).astype(str) == currency]
-                by_month = history.groupby("month")[balance_column].sum().sort_index()
-                if len(by_month) >= 2:
-                    values = by_month.to_numpy(dtype=float)
-                    suggested = max(0.0, values[-1] + (values[-1] - values[0]) / len(values))
+                    history = history[
+                        history["native_currency"].fillna(currency).astype(str) == currency
+                    ]
+                history_by_month = history.groupby("month")[balance_column].sum().sort_index()
+                if len(history_by_month) >= 2:
+                    values = history_by_month.to_numpy(dtype=float)
+                    slope = (values[-1] - values[0]) / len(values)
+                    suggested = max(0.0, values[-1] + slope)
                 else:
                     suggested = float(row[balance_column])
-                asset_items.append({
-                    "account_id": account_id,
-                    "name": account_names.get(account_id, account_id),
-                    "asset_class": row["asset_class"],
-                    "native_currency": "" if currency == "multi" else currency,
-                    "suggested_balance": int(suggested) if suggested.is_integer() else suggested,
-                })
+                asset_items.append(
+                    {
+                        "account_id": account_id,
+                        "name": account_names.get(account_id, account_id),
+                        "asset_class": row["asset_class"],
+                        "native_currency": "" if currency == "multi" else currency,
+                        "suggested_balance": int(suggested) if suggested.is_integer() else suggested,
+                    }
+                )
 
         return render_template(
             "input.html",
@@ -254,12 +328,17 @@ def create_app() -> Flask:
         app.add_url_rule(
             f"/graphs/{route_name}",
             endpoint=f"graph_{route_name}",
-            view_func=lambda builder=builder: builder(request.args.get("months", type=int), request.args.get("forecast", type=int)),
+            view_func=lambda builder=builder: builder(
+                request.args.get("months", type=int),
+                request.args.get("forecast", type=int),
+            ),
         )
 
     @app.after_request
     def add_header(response: Response) -> Response:
-        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, post-check=0, pre-check=0, max-age=0"
+        response.headers["Cache-Control"] = (
+            "no-store, no-cache, must-revalidate, post-check=0, pre-check=0, max-age=0"
+        )
         response.headers["Pragma"] = "no-cache"
         response.headers["Expires"] = "-1"
         return response
