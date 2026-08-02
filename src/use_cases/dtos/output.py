@@ -1,4 +1,8 @@
+from __future__ import annotations
+
+import math
 from dataclasses import dataclass
+
 from src.domain.entities.models import Month
 
 
@@ -40,6 +44,7 @@ class BalanceSheet:
     pension_assets: int
     total_financial_assets: int
     investment_gain_loss: int
+    return_base_assets: int = 0
 
 
 @dataclass
@@ -53,3 +58,5 @@ class FinancialMetrics:
     fi_ratio_12m: float
     fi_ratio_48m: float
     fi_ratio_next_12m: float
+    raw_monthly_return: float = math.nan
+    raw_benchmark_return: float = math.nan
