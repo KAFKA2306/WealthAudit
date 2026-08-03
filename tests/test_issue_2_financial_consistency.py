@@ -108,7 +108,7 @@ def test_valuation_never_uses_future_market_data() -> None:
         balance=100,
     )
 
-    with pytest.raises(ValueError, match="No observed market rate"):
+    with pytest.raises(ValueError, match="Market data is required to convert USD asset"):
         value_asset(asset, usd_account, [market("2026-02")])
 
 
