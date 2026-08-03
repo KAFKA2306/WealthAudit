@@ -25,93 +25,32 @@ jobs:
 
           path = Path('src/infrastructure/web.py')
           text = path.read_text()
-          old = '''            latest = assets[assets["month"] == last_month]
-              group_columns = ["account_id", "asset_class"]
-              if "native_currency" in latest:
-                  group_columns.append("native_currency")
-              latest = latest.groupby(group_columns, dropna=False, as_index=False)[balance_column].sum()
-              recent_asset_months = sorted(assets["month"].unique())[-6:]
-              recent_assets = assets[assets["month"].isin(recent_asset_months)]
-              for _, row in latest.iterrows():
-                  account_id = str(row["account_id"])
-                  row_currency = row.get("native_currency", "")
-                  currency = (
-                      str(row_currency)
-                      if pd.notna(row_currency) and str(row_currency)
-                      else str(account_currencies.get(account_id, ""))
-                  )
-                  history = recent_assets[
-                      (recent_assets["account_id"] == account_id)
-                      & (recent_assets["asset_class"] == row["asset_class"])
-                  ]
-                  if "native_currency" in history and currency and currency != "multi":
-                      history = history[
-                          history["native_currency"].fillna(currency).astype(str) == currency
-                      ]
-                  history_by_month = history.groupby("month")[balance_column].sum().sort_index()
-                  if len(history_by_month) >= 2:
-                      values = history_by_month.to_numpy(dtype=float)
-                      slope = (values[-1] - values[0]) / len(values)
-                      suggested = max(0.0, values[-1] + slope)
-                  else:
-                      suggested = float(row[balance_column])
-                  asset_items.append(
-                      {
-                          "account_id": account_id,
-                          "name": account_names.get(account_id, account_id),
-                          "asset_class": row["asset_class"],
-                          "native_currency": "" if currency == "multi" else currency,
-                          "suggested_balance": int(suggested) if suggested.is_integer() else suggested,
-                      }
-                  )
-          '''
-          new = '''            latest_assets = assets[assets["month"] == last_month]
-              group_columns = ["account_id", "asset_class"]
-              if "native_currency" in latest_assets:
-                  group_columns.append("native_currency")
-              latest_assets = (
-                  latest_assets.groupby(group_columns, dropna=False)[[balance_column]]
-                  .sum()
-                  .reset_index()
-              )
-              recent_asset_months = sorted(assets["month"].unique())[-6:]
-              recent_assets = assets[assets["month"].isin(recent_asset_months)]
-              for _, asset_row in latest_assets.iterrows():
-                  account_id = str(asset_row["account_id"])
-                  row_currency = asset_row.get("native_currency", "")
-                  currency = (
-                      str(row_currency)
-                      if pd.notna(row_currency) and str(row_currency)
-                      else str(account_currencies.get(account_id, ""))
-                  )
-                  history = recent_assets[
-                      (recent_assets["account_id"] == account_id)
-                      & (recent_assets["asset_class"] == asset_row["asset_class"])
-                  ]
-                  if "native_currency" in history and currency and currency != "multi":
-                      history = history[
-                          history["native_currency"].fillna(currency).astype(str) == currency
-                      ]
-                  history_by_month = history.groupby("month")[balance_column].sum().sort_index()
-                  if len(history_by_month) >= 2:
-                      values = history_by_month.to_numpy(dtype=float)
-                      slope = (values[-1] - values[0]) / len(values)
-                      suggested = max(0.0, values[-1] + slope)
-                  else:
-                      suggested = float(asset_row[balance_column])
-                  asset_items.append(
-                      {
-                          "account_id": account_id,
-                          "name": account_names.get(account_id, account_id),
-                          "asset_class": asset_row["asset_class"],
-                          "native_currency": "" if currency == "multi" else currency,
-                          "suggested_balance": int(suggested) if suggested.is_integer() else suggested,
-                      }
-                  )
-          '''
-          if old not in text:
-              raise RuntimeError('Expected asset suggestion block was not found')
-          path.write_text(text.replace(old, new, 1))
+          start_marker = '            last_month = str(assets["month"].max())'
+          end_marker = '\n\n        return render_template('
+          start = text.index(start_marker)
+          end = text.index(end_marker, start)
+          block = text[start:end]
+
+          replacements = {
+              'latest = assets[assets["month"] == last_month]':
+                  'latest_assets = assets[assets["month"] == last_month]',
+              'if "native_currency" in latest:':
+                  'if "native_currency" in latest_assets:',
+              'latest = latest.groupby(group_columns, dropna=False, as_index=False)[balance_column].sum()':
+                  'latest_assets = (\n'
+                  '                latest_assets.groupby(group_columns, dropna=False)[[balance_column]]\n'
+                  '                .sum()\n'
+                  '                .reset_index()\n'
+                  '            )',
+              'for _, row in latest.iterrows():':
+                  'for _, asset_row in latest_assets.iterrows():',
+          }
+          for old, new in replacements.items():
+              if old not in block:
+                  raise RuntimeError(f'Expected web.py fragment was not found: {old}')
+              block = block.replace(old, new, 1)
+          block = block.replace('row[', 'asset_row[').replace('row.get(', 'asset_row.get(')
+          path.write_text(text[:start] + block + text[end:])
           PY
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
