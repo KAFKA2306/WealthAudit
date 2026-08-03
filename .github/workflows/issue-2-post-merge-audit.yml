@@ -1,9 +1,9 @@
 name: Issue 2 post-merge audit and cleanup
 
 on:
-  push:
-    branches:
-      - main
+  issue_comment:
+    types:
+      - created
 
 permissions:
   contents: write
@@ -12,10 +12,12 @@ permissions:
 
 jobs:
   audit-and-cleanup:
-    if: github.event.head_commit.message == 'ci: audit issue 2 and clean merged branch'
+    if: github.event.issue.number == 2 && github.event.comment.body == '/run-issue-2-audit'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: main
 
       - uses: actions/setup-python@v5
         with:
@@ -47,6 +49,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           RESULT: ${{ steps.audit.outputs.result }}
         run: |
+          audited_sha=$(git rev-parse HEAD)
           if [ "${RESULT}" = "0" ]; then
             state=success
             description='Issue 2 post-merge audit passed'
@@ -54,7 +57,7 @@ jobs:
             state=failure
             description='Issue 2 post-merge audit failed'
           fi
-          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${audited_sha}" \
             -f state="${state}" \
             -f context='issue-2/post-merge-audit' \
             -f description="${description}" \
@@ -67,7 +70,7 @@ jobs:
           RESULT: ${{ steps.audit.outputs.result }}
         run: |
           if [ "${RESULT}" = "0" ]; then
-            gh issue comment 2 --body 'Post-merge audit passed on main: compileall, pytest, ruff, and mypy all succeeded. The merged work branch is now eligible for deletion.'
+            gh issue comment 2 --body 'Post-merge audit passed on main: compileall, pytest, ruff, and mypy all succeeded. The merged work branch has been deleted.'
           else
             tail -n 40 issue-2-audit.log > issue-2-audit-tail.log
             {
@@ -91,5 +94,3 @@ jobs:
       - name: Fail workflow when audit failed
         if: steps.audit.outputs.result != '0'
         run: exit 1
-
-# retrigger after workflow registration
