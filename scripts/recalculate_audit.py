@@ -9,6 +9,12 @@ from pathlib import Path
 
 import pandas as pd
 
+REQUIRED_INPUT_FILES = (
+    "data/input/income.csv",
+    "data/input/expense.csv",
+    "data/input/assets.csv",
+    "data/input/market.csv",
+)
 CALCULATED_FILES = (
     "cashflow.csv",
     "balance_sheet.csv",
@@ -24,6 +30,23 @@ PIPELINE = (
 )
 
 
+def require_operational_inputs(repo_root: Path) -> None:
+    """Fail early when the private, gitignored operational dataset is absent."""
+    missing = [path for path in REQUIRED_INPUT_FILES if not (repo_root / path).is_file()]
+    if not missing:
+        return
+    formatted = "\n".join(f"  - {path}" for path in missing)
+    raise FileNotFoundError(
+        "Operational input data is required for the recalculation audit but is "
+        "not present:\n"
+        f"{formatted}\n"
+        "The data/ directory is intentionally excluded from Git. Restore "
+        "data/input from the private Drive source first, for example with "
+        "`task drive:import` after configuring WEALTHAUDIT_DRIVE_DIR, then run "
+        "`task audit:recalculate` again."
+    )
+
+
 def compare_csv(before: Path, after: Path, filename: str) -> pd.DataFrame:
     if not before.exists() or not after.exists():
         return pd.DataFrame()
@@ -34,7 +57,7 @@ def compare_csv(before: Path, after: Path, filename: str) -> pd.DataFrame:
         return pd.DataFrame()
     merged = old.merge(new, on=key, how="outer", suffixes=("_before", "_after"))
     records: list[dict[str, object]] = []
-    common = sorted(set(old.columns) & set(new.columns) - {key})
+    common = sorted((set(old.columns) & set(new.columns)) - {key})
     for column in common:
         before_values = pd.to_numeric(merged[f"{column}_before"], errors="coerce")
         after_values = pd.to_numeric(merged[f"{column}_after"], errors="coerce")
@@ -62,6 +85,7 @@ def run_pipeline(repo_root: Path) -> None:
 
 def main() -> None:
     repo_root = Path(__file__).resolve().parent.parent
+    require_operational_inputs(repo_root)
     calculated = repo_root / "data" / "calculated"
     calculated.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="wealthaudit-before-") as temporary:
