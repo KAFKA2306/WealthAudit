@@ -1,4 +1,4 @@
-name: Issue 2 data recalculation audit
+name: Issue 2 final repository audit
 
 on:
   issue_comment:
@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   audit:
-    if: github.event.issue.number == 2 && github.event.comment.body == '/run-issue-2-data-audit'
+    if: github.event.issue.number == 2 && github.event.comment.body == '/run-issue-2-final-audit'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -22,120 +22,36 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Install uv
-        run: python -m pip install --upgrade uv
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade uv
+          uv sync --extra dev
 
-      - name: Recalculate and validate committed history
-        id: audit
+      - name: Run compile, regression, lint, and type audits
+        run: |
+          uv run python -m compileall -q src scripts tests
+          uv run python -m pytest -q
+          uv run ruff check .
+          uv run mypy src
+
+      - name: Verify private-input audit preflight
         shell: bash
         run: |
           set +e
-          uv sync --extra dev 2>&1 | tee issue-2-data-audit.log
-          sync_result=${PIPESTATUS[0]}
-          if [ "${sync_result}" != "0" ]; then
-            echo "result=${sync_result}" >> "${GITHUB_OUTPUT}"
-            exit 0
-          fi
-          uv run python scripts/recalculate_audit.py 2>&1 | tee -a issue-2-data-audit.log
-          result=${PIPESTATUS[0]}
+          uv run python scripts/recalculate_audit.py > recalculation-preflight.log 2>&1
+          result=$?
+          set -e
           if [ "${result}" = "0" ]; then
-            uv run python - <<'PY' 2>&1 | tee -a issue-2-data-audit.log
-          from pathlib import Path
-          import json
-          import pandas as pd
-
-          root = Path('data/calculated')
-          required = [
-              'asset_valuations.csv',
-              'cashflow.csv',
-              'balance_sheet.csv',
-              'metrics.csv',
-              'normalized.csv',
-              'forecast.csv',
-              'forecast_annual.csv',
-              'recalculation_diff.csv',
-          ]
-          missing = [name for name in required if not (root / name).exists()]
-          if missing:
-              raise RuntimeError(f'Missing calculated outputs: {missing}')
-
-          diff = pd.read_csv(root / 'recalculation_diff.csv')
-          forecast = pd.read_csv(root / 'forecast.csv')
-          normalized = pd.read_csv(root / 'normalized.csv')
-          valuations = pd.read_csv(root / 'asset_valuations.csv')
-
-          forecast_rows = int(forecast.get('is_forecast', pd.Series(dtype=bool)).fillna(False).astype(bool).sum())
-          if forecast_rows != 360:
-              raise RuntimeError(f'Expected 360 forecast rows, got {forecast_rows}')
-
-          required_valuation_columns = {
-              'month', 'account_id', 'asset_class', 'native_currency',
-              'native_balance', 'fx_rate_to_jpy', 'jpy_value'
-          }
-          if not required_valuation_columns.issubset(valuations.columns):
-              raise RuntimeError('asset_valuations.csv is missing audit columns')
-
-          asset_columns = [c for c in normalized.columns if c.startswith('資産_')]
-          class_columns = [c for c in normalized.columns if c.startswith('分類_')]
-          comparable = normalized.dropna(subset=['total_financial_assets'])
-          expected = pd.to_numeric(comparable['total_financial_assets'], errors='raise') * 10000
-          account_total = comparable[asset_columns].apply(pd.to_numeric, errors='coerce').fillna(0).sum(axis=1)
-          class_total = comparable[class_columns].apply(pd.to_numeric, errors='coerce').fillna(0).sum(axis=1)
-          tolerance = expected.abs().mul(1e-9).clip(lower=2.0)
-          if ((account_total - expected).abs() > tolerance).any():
-              raise RuntimeError('Account-level JPY reconciliation failed')
-          if ((class_total - expected).abs() > tolerance).any():
-              raise RuntimeError('Asset-class JPY reconciliation failed')
-
-          summary = {
-              'changed_cells': int(len(diff)),
-              'changed_files': sorted(diff['file'].dropna().astype(str).unique().tolist()) if not diff.empty else [],
-              'max_abs_delta': float(pd.to_numeric(diff['delta'], errors='coerce').abs().max()) if not diff.empty else 0.0,
-              'historical_months': int(normalized['month'].nunique()),
-              'valuation_rows': int(len(valuations)),
-              'forecast_rows': forecast_rows,
-              'annual_rows': int(pd.read_csv(root / 'forecast_annual.csv')['year'].nunique()),
-          }
-          Path('issue-2-data-audit-summary.json').write_text(json.dumps(summary, ensure_ascii=False, indent=2))
-          print(json.dumps(summary, ensure_ascii=False))
-          PY
-            validation_result=${PIPESTATUS[0]}
-            if [ "${validation_result}" != "0" ]; then
-              result=${validation_result}
-            fi
+            echo 'Expected the GitHub runner audit to stop because private data/input is gitignored.'
+            exit 1
           fi
-          echo "result=${result}" >> "${GITHUB_OUTPUT}"
-          exit 0
+          grep -F 'Operational input data is required' recalculation-preflight.log
+          grep -F 'task drive:import' recalculation-preflight.log
+          grep -F 'WEALTHAUDIT_DRIVE_DIR' recalculation-preflight.log
 
-      - name: Record audit result
-        if: always()
+      - name: Record final result
+        if: success()
         env:
           GH_TOKEN: ${{ github.token }}
-          RESULT: ${{ steps.audit.outputs.result }}
         run: |
-          if [ "${RESULT}" = "0" ]; then
-            summary=$(cat issue-2-data-audit-summary.json)
-            {
-              echo 'Committed-history recalculation audit passed.'
-              echo
-              echo '```json'
-              echo "${summary}"
-              echo '```'
-              echo
-              echo 'Validated: full recalculation, JPY account/class reconciliation, native valuation audit columns, 360 forecast months, and annual output generation.'
-            } > issue-2-data-comment.md
-          else
-            tail -n 60 issue-2-data-audit.log > issue-2-data-audit-tail.log
-            {
-              echo 'Committed-history recalculation audit failed.'
-              echo
-              echo '```text'
-              cat issue-2-data-audit-tail.log
-              echo '```'
-            } > issue-2-data-comment.md
-          fi
-          gh issue comment 2 --body-file issue-2-data-comment.md
-
-      - name: Fail when audit failed
-        if: steps.audit.outputs.result != '0'
-        run: exit 1
+          gh issue comment 2 --body 'Final repository audit passed on main: compileall, pytest, ruff, and mypy succeeded. The recalculation command also correctly stopped before modifying outputs because the private data/input set is gitignored, and its Drive-import recovery instructions were verified. Actual historical numeric differences require restoring the private input set and running task audit:recalculate locally.'
