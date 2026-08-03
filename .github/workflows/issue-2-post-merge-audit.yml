@@ -91,3 +91,5 @@ jobs:
       - name: Fail workflow when audit failed
         if: steps.audit.outputs.result != '0'
         run: exit 1
+
+# retrigger after workflow registration
