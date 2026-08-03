@@ -254,7 +254,13 @@ def create_app() -> Flask:
             recent_expense_months = sorted(expense["month"].unique())[-6:] if not expense.empty else []
             recent_expense = expense[expense["month"].isin(recent_expense_months)] if recent_expense_months else expense
             for _, method in methods.iterrows():
-                values = recent_expense[recent_expense["method_id"] == method["method_id"]]
+                values = (
+            recent_expense[
+                recent_expense["method_id"] == method["method_id"]
+            ]
+            if "method_id" in recent_expense.columns
+            else pd.DataFrame(columns=["amount"])
+        )
                 item = {
                     "method_id": method["method_id"],
                     "name": method["name"],
