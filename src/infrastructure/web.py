@@ -273,16 +273,20 @@ def create_app() -> Flask:
         if not assets.empty:
             balance_column = "native_balance" if "native_balance" in assets else "balance"
             last_month = str(assets["month"].max())
-            latest = assets[assets["month"] == last_month]
+            latest_assets = assets[assets["month"] == last_month]
             group_columns = ["account_id", "asset_class"]
-            if "native_currency" in latest:
+            if "native_currency" in latest_assets:
                 group_columns.append("native_currency")
-            latest = latest.groupby(group_columns, dropna=False, as_index=False)[balance_column].sum()
+            latest_assets = (
+                latest_assets.groupby(group_columns, dropna=False)[[balance_column]]
+                .sum()
+                .reset_index()
+            )
             recent_asset_months = sorted(assets["month"].unique())[-6:]
             recent_assets = assets[assets["month"].isin(recent_asset_months)]
-            for _, row in latest.iterrows():
-                account_id = str(row["account_id"])
-                row_currency = row.get("native_currency", "")
+            for _, asset_row in latest_assets.iterrows():
+                account_id = str(asset_row["account_id"])
+                row_currency = asset_row.get("native_currency", "")
                 currency = (
                     str(row_currency)
                     if pd.notna(row_currency) and str(row_currency)
@@ -290,7 +294,7 @@ def create_app() -> Flask:
                 )
                 history = recent_assets[
                     (recent_assets["account_id"] == account_id)
-                    & (recent_assets["asset_class"] == row["asset_class"])
+                    & (recent_assets["asset_class"] == asset_row["asset_class"])
                 ]
                 if "native_currency" in history and currency and currency != "multi":
                     history = history[
@@ -302,12 +306,12 @@ def create_app() -> Flask:
                     slope = (values[-1] - values[0]) / len(values)
                     suggested = max(0.0, values[-1] + slope)
                 else:
-                    suggested = float(row[balance_column])
+                    suggested = float(asset_row[balance_column])
                 asset_items.append(
                     {
                         "account_id": account_id,
                         "name": account_names.get(account_id, account_id),
-                        "asset_class": row["asset_class"],
+                        "asset_class": asset_row["asset_class"],
                         "native_currency": "" if currency == "multi" else currency,
                         "suggested_balance": int(suggested) if suggested.is_integer() else suggested,
                     }
