@@ -49,7 +49,7 @@ def conversion_rate(currency: Currency, market: Market | None, month: str) -> fl
         return 1.0
     if market is None:
         raise ValueError(
-            f"No observed market rate at or before {month} for {currency.value}"
+            f"Market data is required to convert {currency.value} asset at or before {month}"
         )
     if currency == Currency.USD:
         return market.usd_jpy
