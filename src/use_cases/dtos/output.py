@@ -13,7 +13,7 @@ class CashFlowStatement:
     expenditure: int
     net_savings: int
     asset_contribution: int = 0
-    net_worth_contribution: int
+    net_worth_contribution: int = 0
 
     def __init__(
         self,
