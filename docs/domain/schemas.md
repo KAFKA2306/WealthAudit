@@ -28,6 +28,24 @@ Rows belonging to `currency=multi` accounts must specify it.
 - `recalculation_diff.csv`: numeric before/after differences produced by
   `task audit:recalculate`.
 
+## Operational recalculation audit
+
+The `data/` directory contains sensitive operational records and is intentionally
+excluded from Git. A GitHub-hosted runner therefore cannot audit the user's
+actual historical balances unless the private input set has first been restored.
+
+Required files:
+
+- `data/input/income.csv`
+- `data/input/expense.csv`
+- `data/input/assets.csv`
+- `data/input/market.csv`
+
+After configuring `WEALTHAUDIT_DRIVE_DIR`, run `task drive:import`, then
+`task audit:recalculate`. The latter writes numeric before/after differences to
+`data/calculated/recalculation_diff.csv`. It now fails before modifying outputs
+when any required private input is absent.
+
 ## Measurement fields
 
 | Field | Definition | Unit |
