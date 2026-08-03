@@ -49,7 +49,6 @@ class MetricsCalculator:
         metrics: list[FinancialMetrics] = []
 
         for month in sorted(set(cf_map) & set(bs_map)):
-            cf = cf_map[month]
             bs = bs_map[month]
             previous = previous_month(month)
 
