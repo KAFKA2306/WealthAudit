@@ -56,7 +56,7 @@ def test_balance_sheet_prefers_asset_class_risk_level_over_account_risk() -> Non
     assert result[0].total_financial_assets == 1000
 
 
-def test_balance_sheet_uses_cached_market_for_missing_months() -> None:
+def test_balance_sheet_uses_latest_prior_market_for_missing_months() -> None:
     result = BalanceSheetCalculator().calculate(
         assets=[
             Asset(Month("2026-01"), AccountId.DEUTSCHE, AssetClassId.CASH, 10),
@@ -64,7 +64,7 @@ def test_balance_sheet_uses_cached_market_for_missing_months() -> None:
             Asset(Month("2026-05"), AccountId.DEUTSCHE, AssetClassId.CASH, 10),
         ],
         markets=[
-            Market(Month("2026-02"), usd_jpy=150, eur_jpy=160, sp500=5000),
+            Market(Month("2025-12"), usd_jpy=150, eur_jpy=160, sp500=5000),
             Market(Month("2026-04"), usd_jpy=170, eur_jpy=180, sp500=5100),
         ],
         accounts=[
