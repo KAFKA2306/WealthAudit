@@ -31,7 +31,7 @@ def _geometric_mean(values: Iterable[float]) -> float:
     product = 1.0
     for value in usable:
         product *= 1.0 + value
-    return product ** (1.0 / len(usable)) - 1.0
+    return float(product ** (1.0 / len(usable)) - 1.0)
 
 
 class MetricsCalculator:
