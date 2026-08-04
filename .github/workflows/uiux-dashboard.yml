@@ -1,0 +1,39 @@
+name: Validate financial dashboard UI
+
+on:
+  pull_request:
+    paths:
+      - "templates/dashboard.html"
+      - "src/use_cases/graph_service.py"
+      - "tests/test_dashboard_ui.py"
+      - ".github/workflows/uiux-dashboard.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --frozen --extra dev
+
+      - name: Compile changed Python
+        run: uv run python -m py_compile src/use_cases/graph_service.py tests/test_dashboard_ui.py
+
+      - name: Run regression tests
+        run: uv run pytest -q
