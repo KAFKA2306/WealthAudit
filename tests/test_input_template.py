@@ -7,9 +7,8 @@ from src.infrastructure.web import create_app
 class DashboardRangeParser(HTMLParser):
     def __init__(self) -> None:
         super().__init__()
-        self.button_groups: list[list[dict[str, str]]] = []
+        self.range_buttons: list[dict[str, str]] = []
         self.graph_loads: dict[str, str] = {}
-        self._active_group: list[dict[str, str]] | None = None
         self._active_button: dict[str, str] | None = None
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
@@ -22,14 +21,10 @@ class DashboardRangeParser(HTMLParser):
         ):
             self.graph_loads[attr_map["id"]] = attr_map.get("hx-get", "")
 
-        if tag == "div" and "btn-group" in attr_map.get("class", "").split():
-            self._active_group = []
-
-        if tag == "button" and self._active_group is not None:
+        if tag == "button" and "range-button" in attr_map.get("class", "").split():
             self._active_button = {
-                "class": attr_map.get("class", ""),
+                "range": attr_map.get("data-range", ""),
                 "aria_pressed": attr_map.get("aria-pressed", ""),
-                "hx_get": attr_map.get("hx-get", ""),
                 "text": "",
             }
 
@@ -38,14 +33,9 @@ class DashboardRangeParser(HTMLParser):
             self._active_button["text"] += data.strip()
 
     def handle_endtag(self, tag: str) -> None:
-        if tag == "button" and self._active_group is not None:
-            if self._active_button is not None:
-                self._active_group.append(self._active_button)
+        if tag == "button" and self._active_button is not None:
+            self.range_buttons.append(self._active_button)
             self._active_button = None
-
-        if tag == "div" and self._active_group is not None:
-            self.button_groups.append(self._active_group)
-            self._active_group = None
 
 
 class InputTemplateParser(HTMLParser):
@@ -138,21 +128,26 @@ def test_dashboard_graph_ranges_default_to_one_year() -> None:
         "/graphs/fi?months=12",
     }
 
-    assert len(parser.button_groups) == 6
-    for group in parser.button_groups:
-        assert [button["text"] for button in group] == ["1年", "全期間", "5年予測"]
-        assert "featured" in group[0]["class"].split()
-        assert group[0]["aria_pressed"] == "true"
-        assert group[0]["hx_get"].endswith("?months=12")
-        assert all("featured" not in button["class"].split() for button in group[1:])
-        assert all(button["aria_pressed"] == "false" for button in group[1:])
+    assert [button["range"] for button in parser.range_buttons] == ["1y", "all", "forecast"]
+    assert [button["text"] for button in parser.range_buttons] == [
+        "直近1年・実績",
+        "全期間・実績",
+        "直近1年＋5年予測",
+    ]
+    assert parser.range_buttons[0]["aria_pressed"] == "true"
+    assert all(button["aria_pressed"] == "false" for button in parser.range_buttons[1:])
 
 
-def test_dashboard_range_buttons_update_selected_state_on_click() -> None:
+def test_dashboard_range_buttons_restore_url_and_update_all_graphs() -> None:
     response = create_app().test_client().get("/")
     html = response.get_data(as_text=True)
 
     assert response.status_code == 200
-    assert 'document.addEventListener("click"' in html
-    assert 'item.classList.toggle("featured", selected)' in html
-    assert 'item.setAttribute("aria-pressed", selected ? "true" : "false")' in html
+    assert "const rangeQueries" in html
+    assert "new URLSearchParams(location.search)" in html
+    assert "history.replaceState" in html
+    assert "function loadRange(range)" in html
+    assert "document.querySelectorAll('.range-button')" in html
+    assert "button.setAttribute('aria-pressed'" in html
+    assert "document.querySelectorAll('[data-route]')" in html
+    assert "htmx.ajax('GET'" in html
