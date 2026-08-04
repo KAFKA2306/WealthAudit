@@ -1,637 +1,233 @@
 <!DOCTYPE html>
 <html lang="ja">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>家計ダッシュボード</title>
+    <meta name="description" content="純資産、月次収支、更新状態、警告、実績と予測を分離して確認するローカル家計ダッシュボード。">
+    <title>WealthAudit | 家計判断ダッシュボード</title>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='18' fill='%2317233f'/%3E%3Ccircle cx='25' cy='32' r='12' fill='none' stroke='%23f1dfb5' stroke-width='5'/%3E%3Ccircle cx='41' cy='32' r='8' fill='%23c99a3a'/%3E%3C/svg%3E">
     <script src="https://cdn.plot.ly/plotly-3.3.0.min.js" defer></script>
     <script src="https://unpkg.com/htmx.org@2.0.1" defer></script>
     <style>
         :root {
             --canvas: #fbf8f1;
-            --surface: rgba(255, 255, 255, 0.86);
-            --surface-solid: #ffffff;
+            --surface: rgba(255,255,255,.92);
             --ink: #13233f;
-            --muted: #788291;
-            --line: rgba(19, 35, 63, 0.1);
-            --gold: #c99a3a;
+            --muted: #667386;
+            --line: rgba(19,35,63,.16);
+            --line-strong: rgba(19,35,63,.3);
+            --gold: #a7771f;
             --gold-soft: #f1dfb5;
             --navy: #17233f;
-            --sage: #738b73;
-            --rose: #b87460;
-            --shadow: 0 24px 80px rgba(23, 35, 63, 0.12);
-            --shadow-soft: 0 14px 36px rgba(23, 35, 63, 0.08);
-            --radius-xl: 34px;
-            --radius-lg: 24px;
-            --radius-md: 16px;
+            --sage: #5d785f;
+            --rose: #a65343;
+            --shadow: 0 20px 60px rgba(23,35,63,.1);
+            --radius: 22px;
         }
-
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-
+        * { box-sizing: border-box; }
+        html { scroll-behavior: smooth; scroll-padding-top: 24px; }
         body {
+            margin: 0;
             min-height: 100vh;
-            color: var(--ink);
-            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-            background:
-                radial-gradient(circle at 7% 10%, rgba(241, 223, 181, 0.65), transparent 34rem),
-                radial-gradient(circle at 90% 3%, rgba(115, 139, 115, 0.22), transparent 30rem),
-                linear-gradient(135deg, #fffdf8 0%, var(--canvas) 48%, #f6efe0 100%);
-            padding: 32px;
-        }
-
-        body::before {
-            content: "";
-            position: fixed;
-            inset: 0;
-            pointer-events: none;
-            background-image:
-                linear-gradient(rgba(19, 35, 63, 0.035) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(19, 35, 63, 0.035) 1px, transparent 1px);
-            background-size: 44px 44px;
-            mask-image: linear-gradient(to bottom, black, transparent 78%);
-        }
-
-        a {
-            color: inherit;
-        }
-
-        .dashboard {
-            width: min(1480px, 100%);
-            margin: 0 auto;
-            position: relative;
-        }
-
-        .topbar {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 24px;
-            margin-bottom: 32px;
-        }
-
-        .brand {
-            display: inline-flex;
-            align-items: center;
-            gap: 14px;
-            font-weight: 800;
-            letter-spacing: 0.08em;
-            text-transform: uppercase;
-            color: var(--navy);
-        }
-
-        .brand-mark {
-            width: 44px;
-            height: 44px;
-            display: grid;
-            place-items: center;
-            border-radius: 50%;
-            background: linear-gradient(145deg, var(--navy), #263b67);
-            color: #fff7e6;
-            box-shadow: 0 12px 32px rgba(23, 35, 63, 0.24);
-        }
-
-        .brand-mark::before {
-            content: "";
-            width: 16px;
-            height: 16px;
-            border: 2px solid var(--gold-soft);
-            border-radius: 50%;
-            box-shadow: 10px 0 0 -3px var(--gold);
-        }
-
-        .nav-actions {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            flex-wrap: wrap;
-        }
-
-        .pill {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            min-height: 44px;
-            padding: 0 18px;
-            border: 1px solid var(--line);
-            border-radius: 999px;
-            background: rgba(255, 255, 255, 0.72);
-            color: var(--muted);
-            text-decoration: none;
-            font-weight: 700;
-            font-size: 0.88rem;
-            box-shadow: 0 8px 26px rgba(23, 35, 63, 0.06);
-            backdrop-filter: blur(16px);
-            transition: transform 180ms ease, box-shadow 180ms ease, color 180ms ease;
-        }
-
-        .pill:hover {
-            transform: translateY(-2px);
-            color: var(--ink);
-            box-shadow: var(--shadow-soft);
-        }
-
-        .pill-primary {
-            border-color: rgba(201, 154, 58, 0.42);
-            background: linear-gradient(135deg, #17233f 0%, #273a66 52%, #c99a3a 180%);
-            color: #fffaf0;
-        }
-
-        .pill-primary:hover {
-            color: #fffaf0;
-        }
-
-        .hero {
-            display: grid;
-            grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
-            gap: 28px;
-            align-items: stretch;
-            margin-bottom: 28px;
-        }
-
-        .hero-panel,
-        .insight-panel,
-        .card {
-            border: 1px solid rgba(255, 255, 255, 0.72);
-            background: var(--surface);
-            box-shadow: var(--shadow);
-            backdrop-filter: blur(22px);
-        }
-
-        .hero-panel {
-            position: relative;
-            overflow: hidden;
-            border-radius: var(--radius-xl);
-            padding: clamp(32px, 6vw, 72px);
-            min-height: 430px;
-        }
-
-        .hero-panel::before {
-            content: "";
-            position: absolute;
-            width: 340px;
-            height: 340px;
-            right: -90px;
-            top: -120px;
-            border-radius: 50%;
-            background: radial-gradient(circle, rgba(201, 154, 58, 0.34), rgba(201, 154, 58, 0));
-        }
-
-        .hero-panel::after {
-            content: "";
-            position: absolute;
-            right: 42px;
-            bottom: 42px;
-            width: min(38vw, 360px);
-            height: min(38vw, 360px);
-            border: 1px solid rgba(201, 154, 58, 0.28);
-            border-radius: 50%;
-            box-shadow: inset 0 0 0 42px rgba(255, 255, 255, 0.42);
-        }
-
-        .eyebrow {
-            display: inline-flex;
-            align-items: center;
-            gap: 10px;
-            margin-bottom: 26px;
-            color: var(--gold);
-            font-size: 0.78rem;
-            font-weight: 800;
-            letter-spacing: 0.18em;
-            text-transform: uppercase;
-        }
-
-        .eyebrow::before {
-            content: "";
-            width: 38px;
-            height: 1px;
-            background: var(--gold);
-        }
-
-        h1 {
-            position: relative;
-            z-index: 1;
-            max-width: 760px;
-            color: var(--navy);
-            font-family: "Playfair Display", serif;
-            font-size: clamp(3.3rem, 8vw, 7.4rem);
-            line-height: 0.9;
-            letter-spacing: -0.07em;
-        }
-
-        .hero-copy {
-            position: relative;
-            z-index: 1;
-            max-width: 650px;
-            margin-top: 28px;
-            color: var(--muted);
-            font-size: clamp(1rem, 1.5vw, 1.18rem);
-            line-height: 1.8;
-        }
-
-        .hero-metrics {
-            position: relative;
-            z-index: 1;
-            display: grid;
-            grid-template-columns: repeat(3, minmax(0, 1fr));
-            gap: 14px;
-            max-width: 760px;
-            margin-top: 42px;
-        }
-
-        .metric {
-            min-height: 118px;
-            padding: 22px;
-            border: 1px solid var(--line);
-            border-radius: 22px;
-            background: rgba(255, 255, 255, 0.72);
-        }
-
-        .metric strong {
-            display: block;
-            color: var(--navy);
-            font-size: 1.45rem;
-            line-height: 1;
-        }
-
-        .metric span {
-            display: block;
-            margin-top: 10px;
-            color: var(--muted);
-            font-size: 0.78rem;
-            font-weight: 800;
-            letter-spacing: 0.12em;
-            text-transform: uppercase;
-        }
-
-        .insight-panel {
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            gap: 24px;
-            border-radius: var(--radius-xl);
-            padding: 34px;
-            overflow: hidden;
-        }
-
-        .orbital-card {
-            position: relative;
-            min-height: 260px;
-            border-radius: 30px;
-            background:
-                radial-gradient(circle at 50% 42%, rgba(255, 255, 255, 1), rgba(255, 248, 229, 0.92) 34%, rgba(23, 35, 63, 0.08) 35%, rgba(255, 255, 255, 0.58) 36%),
-                linear-gradient(145deg, #fffaf0, #fff);
-            border: 1px solid rgba(201, 154, 58, 0.24);
-            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
-        }
-
-        .orbital-card::before,
-        .orbital-card::after {
-            content: "";
-            position: absolute;
-            inset: 44px;
-            border: 1px solid rgba(201, 154, 58, 0.3);
-            border-radius: 50%;
-        }
-
-        .orbital-card::after {
-            inset: 82px;
-            border-color: rgba(23, 35, 63, 0.12);
-        }
-
-        .orbital-label {
-            position: absolute;
-            left: 28px;
-            bottom: 28px;
-            right: 28px;
-        }
-
-        .orbital-label strong {
-            display: block;
-            font-family: "Playfair Display", serif;
-            font-size: 2rem;
-            color: var(--navy);
-        }
-
-        .orbital-label span {
-            color: var(--muted);
-            line-height: 1.7;
-        }
-
-        .section-heading {
-            display: flex;
-            justify-content: space-between;
-            align-items: end;
-            gap: 24px;
-            margin: 46px 4px 20px;
-        }
-
-        .section-heading h2 {
-            color: var(--navy);
-            font-family: "Playfair Display", serif;
-            font-size: clamp(2rem, 4vw, 3.4rem);
-            line-height: 1;
-            letter-spacing: -0.04em;
-        }
-
-        .section-heading p {
-            max-width: 520px;
-            color: var(--muted);
-            line-height: 1.7;
-        }
-
-        .grid {
-            display: grid;
-            grid-template-columns: minmax(0, 1fr);
-            gap: 24px;
-            width: min(1120px, 100%);
-            margin: 0 auto;
-        }
-
-        .card {
-            border-radius: var(--radius-lg);
             padding: 24px;
-            transition: transform 180ms ease, box-shadow 180ms ease;
-        }
-
-        .card:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 28px 90px rgba(23, 35, 63, 0.16);
-        }
-
-        .card-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            gap: 18px;
-            margin-bottom: 14px;
-        }
-
-        .card-kicker {
-            display: block;
-            margin-bottom: 7px;
-            color: var(--gold);
-            font-size: 0.72rem;
-            font-weight: 800;
-            letter-spacing: 0.14em;
-            text-transform: uppercase;
-        }
-
-        .card-title {
-            color: var(--navy);
-            font-size: 1.14rem;
-            font-weight: 800;
-            letter-spacing: -0.02em;
-        }
-
-        .btn-group {
-            display: flex;
-            gap: 8px;
-            padding: 5px;
-            border: 1px solid var(--line);
-            border-radius: 999px;
-            background: rgba(246, 239, 224, 0.74);
-        }
-
-        .btn {
-            min-width: 46px;
-            border: 0;
-            border-radius: 999px;
-            padding: 9px 13px;
-            background: transparent;
-            color: var(--muted);
-            cursor: pointer;
-            font: inherit;
-            font-size: 0.78rem;
-            font-weight: 800;
-            transition: background 160ms ease, color 160ms ease, transform 160ms ease;
-        }
-
-        .btn:hover,
-        .btn:focus-visible {
-            background: var(--surface-solid);
-            color: var(--navy);
-            transform: translateY(-1px);
-            outline: none;
-        }
-
-        .btn.featured {
-            background: var(--navy);
-            color: #fffaf0;
-        }
-
-        .graph-container {
-            min-height: 440px;
-            display: grid;
-            place-items: center;
-            overflow: hidden;
-            border: 1px solid rgba(19, 35, 63, 0.07);
-            border-radius: 20px;
+            color: var(--ink);
             background:
-                linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(255, 252, 244, 0.86)),
-                var(--surface-solid);
+                radial-gradient(circle at 7% 4%, rgba(241,223,181,.62), transparent 30rem),
+                radial-gradient(circle at 92% 2%, rgba(93,120,95,.18), transparent 28rem),
+                var(--canvas);
+            font-family: system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+            font-size: 16px;
+            line-height: 1.65;
         }
-
-        .spinner {
-            display: inline-flex;
-            align-items: center;
-            gap: 12px;
-            color: var(--muted);
-            font-size: 0.9rem;
-            font-weight: 800;
-            letter-spacing: 0.1em;
-            text-transform: uppercase;
+        a { color: inherit; }
+        button { font: inherit; }
+        a:focus-visible, button:focus-visible, summary:focus-visible, [tabindex="0"]:focus-visible {
+            outline: 3px solid #1f65ad;
+            outline-offset: 3px;
         }
-
-        .spinner::after {
-            content: "";
-            width: 18px;
-            height: 18px;
-            border: 2px solid rgba(201, 154, 58, 0.24);
-            border-top-color: var(--gold);
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
+        .skip-link { position: fixed; top: 8px; left: 8px; z-index: 100; padding: 11px 15px; border-radius: 10px; background: var(--navy); color: white; transform: translateY(-150%); }
+        .skip-link:focus { transform: translateY(0); }
+        .dashboard { width: min(1280px,100%); margin: auto; }
+        .topbar { display: flex; justify-content: space-between; align-items: center; gap: 18px; margin-bottom: 34px; }
+        .brand { display: inline-flex; min-height: 44px; align-items: center; gap: 12px; text-decoration: none; font-weight: 900; letter-spacing: .06em; }
+        .brand-mark { display: grid; place-items: center; width: 42px; height: 42px; border-radius: 14px; background: var(--navy); color: white; }
+        .nav-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+        .pill { display: inline-flex; min-height: 44px; align-items: center; padding: 8px 15px; border: 1px solid var(--line); border-radius: 999px; background: rgba(255,255,255,.82); text-decoration: none; font-weight: 750; }
+        .pill-primary { background: var(--navy); color: white; }
+        .intro { display: grid; grid-template-columns: minmax(0,1.25fr) minmax(280px,.75fr); gap: 22px; align-items: stretch; }
+        .intro-main, .privacy-card, .status-card, .warning-panel, .range-panel, .chart-card { border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); box-shadow: var(--shadow); }
+        .intro-main { padding: clamp(28px,6vw,62px); }
+        .eyebrow { margin: 0 0 12px; color: var(--gold); font-size: 13px; font-weight: 900; letter-spacing: .13em; text-transform: uppercase; }
+        h1 { margin: 0; max-width: 13ch; font-size: clamp(42px,7vw,82px); line-height: .98; letter-spacing: -.06em; }
+        .lead { max-width: 720px; margin: 22px 0 0; color: var(--muted); font-size: 17px; }
+        .privacy-card { display: flex; flex-direction: column; justify-content: space-between; padding: 24px; }
+        .privacy-card h2 { margin: 7px 0; font-size: 24px; }
+        .privacy-card p { margin: 0; color: var(--muted); }
+        .privacy-list { display: grid; gap: 8px; margin: 18px 0 0; padding: 0; list-style: none; }
+        .privacy-list li { padding: 9px 11px; border-radius: 11px; background: #f4f6f8; font-size: 14px; }
+        .privacy-list li::before { content: "✓"; margin-right: 7px; color: var(--sage); font-weight: 900; }
+        .section { margin-top: 34px; }
+        .section-heading { display: flex; justify-content: space-between; align-items: end; gap: 20px; margin-bottom: 14px; }
+        .section-heading h2 { margin: 0; font-size: clamp(28px,4vw,42px); letter-spacing: -.04em; }
+        .section-heading p { max-width: 580px; margin: 0; color: var(--muted); }
+        .status-grid { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 12px; }
+        .status-card { padding: 18px; }
+        .status-card span { display: block; color: var(--muted); font-size: 13px; font-weight: 750; }
+        .status-card strong { display: block; margin-top: 8px; font-size: clamp(23px,3vw,34px); letter-spacing: -.04em; }
+        .status-card small { display: block; margin-top: 5px; color: var(--muted); }
+        .warning-panel { display: grid; grid-template-columns: minmax(180px,.35fr) minmax(0,1fr); gap: 20px; padding: 20px; border-left: 7px solid var(--gold); }
+        .warning-panel h3 { margin: 4px 0 0; font-size: 21px; }
+        .warning-list { margin: 0; padding-left: 22px; }
+        .warning-list li + li { margin-top: 6px; }
+        .range-panel { display: flex; justify-content: space-between; gap: 18px; align-items: center; padding: 16px 18px; }
+        .range-copy strong { display: block; }
+        .range-copy span { color: var(--muted); font-size: 14px; }
+        .range-buttons { display: flex; flex-wrap: wrap; gap: 6px; }
+        .range-button { min-height: 44px; padding: 8px 15px; border: 1px solid var(--line-strong); border-radius: 999px; background: white; color: var(--ink); cursor: pointer; font-weight: 800; }
+        .range-button[aria-pressed="true"] { background: var(--navy); color: white; }
+        .forecast-note { margin: 12px 0 0; padding: 13px 15px; border: 1px solid #c7a359; border-radius: 13px; background: #fff6df; color: #604712; }
+        .chart-grid { display: grid; gap: 18px; }
+        .chart-card { padding: 20px; overflow: hidden; }
+        .chart-header { display: flex; justify-content: space-between; gap: 18px; align-items: start; margin-bottom: 12px; }
+        .chart-header h3 { margin: 2px 0; font-size: 22px; }
+        .chart-header p { max-width: 700px; margin: 0; color: var(--muted); font-size: 14px; }
+        .chart-kicker { color: var(--gold); font-size: 12px; font-weight: 900; letter-spacing: .12em; text-transform: uppercase; }
+        .graph-container { min-height: 460px; border: 1px solid var(--line); border-radius: 16px; background: white; overflow: hidden; }
+        .spinner { display: grid; min-height: 460px; place-items: center; color: var(--muted); font-weight: 800; }
+        .forecast-boundary { margin: 0 16px 12px; padding: 10px 12px; border-radius: 10px; background: #f5f7fa; color: var(--muted); font-size: 14px; }
+        .chart-table { margin: 0 16px 16px; border: 1px solid var(--line); border-radius: 13px; background: white; }
+        .chart-table summary { min-height: 44px; padding: 11px 13px; cursor: pointer; font-weight: 800; }
+        .chart-table-scroll { max-height: 420px; overflow: auto; border-top: 1px solid var(--line); }
+        .chart-table table { width: 100%; min-width: 680px; border-collapse: collapse; font-size: 14px; }
+        .chart-table th, .chart-table td { padding: 9px 11px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
+        .chart-table th:first-child, .chart-table td:first-child { text-align: left; }
+        .chart-table thead th { position: sticky; top: 0; background: #eef2f7; }
+        .data-status { display: inline-flex; min-height: 27px; align-items: center; padding: 3px 8px; border: 1px solid var(--line); border-radius: 999px; font-size: 12px; font-weight: 850; }
+        .data-status-実績::before { content: "●"; margin-right: 5px; color: var(--sage); }
+        .data-status-予測 { border-style: dashed; background: #fff6df; color: #604712; }
+        .data-status-予測::before { content: "◇"; margin-right: 5px; }
+        .htmx-request .spinner { display: grid; }
+        footer { margin-top: 34px; padding: 20px 0 12px; border-top: 1px solid var(--line); color: var(--muted); font-size: 14px; }
+        @media (max-width: 980px) { .intro { grid-template-columns: 1fr; } .status-grid { grid-template-columns: 1fr 1fr; } }
+        @media (max-width: 700px) {
+            body { padding: 12px; }
+            .topbar, .section-heading, .range-panel, .chart-header { align-items: stretch; flex-direction: column; }
+            .status-grid { grid-template-columns: 1fr; }
+            .warning-panel { grid-template-columns: 1fr; }
+            .range-buttons { display: grid; grid-template-columns: 1fr; }
+            .range-button { width: 100%; }
+            .graph-container, .spinner { min-height: 390px; }
+            h1 { font-size: 43px; }
         }
-
-        @keyframes spin {
-            to {
-                transform: rotate(360deg);
-            }
-        }
-
-        @media (max-width: 1100px) {
-            body {
-                padding: 20px;
-            }
-
-            .hero {
-                grid-template-columns: 1fr;
-            }
-        }
-
-        @media (max-width: 720px) {
-            .topbar,
-            .section-heading,
-            .card-header {
-                align-items: stretch;
-                flex-direction: column;
-            }
-
-            .hero-panel,
-            .insight-panel,
-            .card {
-                border-radius: 24px;
-            }
-
-            .hero-metrics {
-                grid-template-columns: 1fr;
-            }
-
-            .btn-group {
-                align-self: flex-start;
-                max-width: 100%;
-                overflow-x: auto;
-            }
-        }
+        @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
     </style>
 </head>
-
 <body>
+    <a class="skip-link" href="#current-status">現在の家計状況へ移動</a>
     <main class="dashboard">
         <nav class="topbar" aria-label="メイン">
-            <a class="brand" href="/" aria-label="ダッシュボード">
-                <span class="brand-mark" aria-hidden="true"></span>
-                BSPL
-            </a>
-            <div class="nav-actions">
-                <a href="/input" class="pill pill-primary">月次入力</a>
-            </div>
+            <a class="brand" href="/" aria-label="WealthAudit ダッシュボード"><span class="brand-mark" aria-hidden="true">WA</span>WealthAudit</a>
+            <div class="nav-actions"><a href="/input" class="pill pill-primary">月次入力</a></div>
         </nav>
 
-        <section class="grid" aria-label="家計グラフ">
-            <article class="card">
-                <div class="card-header">
-                    <div>
-                        <span class="card-kicker">貸借対照</span>
-                        <span class="card-title">純資産</span>
-                    </div>
-                    <div class="btn-group" aria-label="純資産の表示期間">
-                        <button type="button" class="btn featured" aria-pressed="true" hx-get="/graphs/net-worth?months=12" hx-target="#net-worth-graph">1年</button>
-                        <button type="button" class="btn" aria-pressed="false" hx-get="/graphs/net-worth" hx-target="#net-worth-graph">全期間</button>
-                        <button type="button" class="btn" aria-pressed="false" hx-get="/graphs/net-worth?forecast=60" hx-target="#net-worth-graph">5年予測</button>
-                    </div>
-                </div>
-                <div id="net-worth-graph" class="graph-container" hx-get="/graphs/net-worth?months=12" hx-trigger="load">
-                    <span class="spinner">読み込み中</span>
-                </div>
-            </article>
-
-            <article class="card">
-                <div class="card-header">
-                    <div>
-                        <span class="card-kicker">月次</span>
-                        <span class="card-title">収支</span>
-                    </div>
-                    <div class="btn-group" aria-label="収支の表示期間">
-                        <button type="button" class="btn featured" aria-pressed="true" hx-get="/graphs/cashflow?months=12" hx-target="#cashflow-graph">1年</button>
-                        <button type="button" class="btn" aria-pressed="false" hx-get="/graphs/cashflow" hx-target="#cashflow-graph">全期間</button>
-                        <button type="button" class="btn" aria-pressed="false" hx-get="/graphs/cashflow?forecast=60" hx-target="#cashflow-graph">5年予測</button>
-                    </div>
-                </div>
-                <div id="cashflow-graph" class="graph-container" hx-get="/graphs/cashflow?months=12" hx-trigger="load">
-                    <span class="spinner">読み込み中</span>
-                </div>
-            </article>
-
-            <article class="card">
-                <div class="card-header">
-                    <div>
-                        <span class="card-kicker">構成</span>
-                        <span class="card-title">資産配分</span>
-                    </div>
-                    <div class="btn-group" aria-label="資産配分の表示期間">
-                        <button type="button" class="btn featured" aria-pressed="true" hx-get="/graphs/allocation?months=12" hx-target="#allocation-graph">1年</button>
-                        <button type="button" class="btn" aria-pressed="false" hx-get="/graphs/allocation" hx-target="#allocation-graph">全期間</button>
-                        <button type="button" class="btn" aria-pressed="false" hx-get="/graphs/allocation?forecast=60" hx-target="#allocation-graph">5年予測</button>
-                    </div>
-                </div>
-                <div id="allocation-graph" class="graph-container" hx-get="/graphs/allocation?months=12" hx-trigger="load">
-                    <span class="spinner">読み込み中</span>
-                </div>
-            </article>
-
-            <article class="card">
-                <div class="card-header">
-                    <div>
-                        <span class="card-kicker">健全性</span>
-                        <span class="card-title">財務比率</span>
-                    </div>
-                    <div class="btn-group" aria-label="財務比率の表示期間">
-                        <button type="button" class="btn featured" aria-pressed="true" hx-get="/graphs/ratios?months=12" hx-target="#ratios-graph">1年</button>
-                        <button type="button" class="btn" aria-pressed="false" hx-get="/graphs/ratios" hx-target="#ratios-graph">全期間</button>
-                        <button type="button" class="btn" aria-pressed="false" hx-get="/graphs/ratios?forecast=60" hx-target="#ratios-graph">5年予測</button>
-                    </div>
-                </div>
-                <div id="ratios-graph" class="graph-container" hx-get="/graphs/ratios?months=12" hx-trigger="load">
-                    <span class="spinner">読み込み中</span>
-                </div>
-            </article>
-
-            <article class="card">
-                <div class="card-header">
-                    <div>
-                        <span class="card-kicker">運用</span>
-                        <span class="card-title">投資リターン</span>
-                    </div>
-                    <div class="btn-group" aria-label="投資リターンの表示期間">
-                        <button type="button" class="btn featured" aria-pressed="true" hx-get="/graphs/returns?months=12" hx-target="#returns-graph">1年</button>
-                        <button type="button" class="btn" aria-pressed="false" hx-get="/graphs/returns" hx-target="#returns-graph">全期間</button>
-                        <button type="button" class="btn" aria-pressed="false" hx-get="/graphs/returns?forecast=60" hx-target="#returns-graph">5年予測</button>
-                    </div>
-                </div>
-                <div id="returns-graph" class="graph-container" hx-get="/graphs/returns?months=12" hx-trigger="load">
-                    <span class="spinner">読み込み中</span>
-                </div>
-            </article>
-
-            <article class="card">
-                <div class="card-header">
-                    <div>
-                        <span class="card-kicker">自立度</span>
-                        <span class="card-title">FI比率</span>
-                    </div>
-                    <div class="btn-group" aria-label="FI比率の表示期間">
-                        <button type="button" class="btn featured" aria-pressed="true" hx-get="/graphs/fi?months=12" hx-target="#fi-graph">1年</button>
-                        <button type="button" class="btn" aria-pressed="false" hx-get="/graphs/fi" hx-target="#fi-graph">全期間</button>
-                        <button type="button" class="btn" aria-pressed="false" hx-get="/graphs/fi?forecast=60" hx-target="#fi-graph">5年予測</button>
-                    </div>
-                </div>
-                <div id="fi-graph" class="graph-container" hx-get="/graphs/fi?months=12" hx-trigger="load">
-                    <span class="spinner">読み込み中</span>
-                </div>
-            </article>
+        <section class="intro" aria-labelledby="page-title">
+            <div class="intro-main"><p class="eyebrow">Local-first personal finance</p><h1 id="page-title">現在を確認し、予測の前提を分ける。</h1><p class="lead">最初に純資産、月次フロー、前月差、データ鮮度を確認します。予測は実績の延長として塗りつぶさず、背景付き区間と表の「予測」ラベルで分離します。</p></div>
+            <aside class="privacy-card" aria-labelledby="privacy-title"><div><p class="eyebrow">Privacy boundary</p><h2 id="privacy-title">ローカル処理</h2><p>この画面はローカルの計算済みCSVを読みます。ブラウザから外部へ家計データを送信する機能は持ちません。</p></div><ul class="privacy-list"><li>保存先: data/calculated/forecast.csv</li><li>HTTPキャッシュ無効</li><li>入力・出力はGit管理外を推奨</li></ul></aside>
         </section>
+
+        <section class="section" id="current-status" tabindex="-1" aria-labelledby="status-title">
+            <div class="section-heading"><div><p class="eyebrow">Current actuals</p><h2 id="status-title">現在の家計状況</h2></div><p>完了済みの最新月だけを要約します。各値は純資産・収支グラフの表から自動的に照合します。</p></div>
+            <div class="status-grid">
+                <article class="status-card"><span>純資産</span><strong id="summary-net-worth">読み込み中</strong><small id="summary-month">最新実績月 —</small></article>
+                <article class="status-card"><span>月次フロー</span><strong id="summary-cashflow">読み込み中</strong><small>収入・支出・投資損益を反映</small></article>
+                <article class="status-card"><span>前月差</span><strong id="summary-change">読み込み中</strong><small>純資産合計の差</small></article>
+                <article class="status-card"><span>データ状態</span><strong id="summary-health">確認中</strong><small id="summary-updated">グラフ読込待ち</small></article>
+            </div>
+        </section>
+
+        <section class="section warning-panel" aria-labelledby="warning-title"><div><p class="eyebrow">Needs attention</p><h3 id="warning-title">確認事項</h3></div><ul class="warning-list" id="warning-list" aria-live="polite"><li>純資産・収支データを読み込んでいます。</li></ul></section>
+
+        <section class="section range-panel" aria-labelledby="range-title">
+            <div class="range-copy"><strong id="range-title">全グラフの表示期間</strong><span>選択はURLへ保存され、再読込で復元されます。</span></div>
+            <div class="range-buttons" role="group" aria-label="表示期間"><button class="range-button" type="button" data-range="1y" aria-pressed="true">直近1年・実績</button><button class="range-button" type="button" data-range="all" aria-pressed="false">全期間・実績</button><button class="range-button" type="button" data-range="forecast" aria-pressed="false">直近1年＋5年予測</button></div>
+        </section>
+        <p class="forecast-note" id="forecast-note" hidden><strong>予測表示中:</strong> 完了月より後の背景付き領域と、表で「予測」と記載された行はモデル出力です。確定値ではありません。</p>
+
+        <section class="section" aria-labelledby="analysis-title">
+            <div class="section-heading"><div><p class="eyebrow">Analysis details</p><h2 id="analysis-title">分析詳細</h2></div><p>各グラフには、同じ対象期間・系列・単位のHTML表を付けています。</p></div>
+            <div class="chart-grid">
+                <article class="chart-card"><header class="chart-header"><div><span class="chart-kicker">Balance sheet</span><h3>純資産</h3><p>流動資産、リスク資産、年金資産と合計を確認します。</p></div></header><div id="net-worth-graph" class="graph-container" data-route="net-worth" hx-get="/graphs/net-worth?months=12" hx-trigger="load" hx-swap="innerHTML"><span class="spinner">読み込み中</span></div></article>
+                <article class="chart-card"><header class="chart-header"><div><span class="chart-kicker">Monthly flow</span><h3>収支</h3><p>税引後収入、支出、投資損益、純資産増減フローを分離します。</p></div></header><div id="cashflow-graph" class="graph-container" data-route="cashflow" hx-get="/graphs/cashflow?months=12" hx-trigger="load" hx-swap="innerHTML"><span class="spinner">読み込み中</span></div></article>
+                <article class="chart-card"><header class="chart-header"><div><span class="chart-kicker">Allocation</span><h3>資産配分</h3><p>各資産クラスの構成比と変化を確認します。</p></div></header><div id="allocation-graph" class="graph-container" data-route="allocation" hx-get="/graphs/allocation?months=12" hx-trigger="load" hx-swap="innerHTML"><span class="spinner">読み込み中</span></div></article>
+                <article class="chart-card"><header class="chart-header"><div><span class="chart-kicker">Financial health</span><h3>財務比率</h3><p>貯蓄率とリスク資産比率を同じ期間で確認します。</p></div></header><div id="ratios-graph" class="graph-container" data-route="ratios" hx-get="/graphs/ratios?months=12" hx-trigger="load" hx-swap="innerHTML"><span class="spinner">読み込み中</span></div></article>
+                <article class="chart-card"><header class="chart-header"><div><span class="chart-kicker">Investment</span><h3>投資リターン</h3><p>ポートフォリオ、ベンチマーク、超過収益を区別します。</p></div></header><div id="returns-graph" class="graph-container" data-route="returns" hx-get="/graphs/returns?months=12" hx-trigger="load" hx-swap="innerHTML"><span class="spinner">読み込み中</span></div></article>
+                <article class="chart-card"><header class="chart-header"><div><span class="chart-kicker">Financial independence</span><h3>FI比率</h3><p>12か月・48か月実績と予測系列を区別します。</p></div></header><div id="fi-graph" class="graph-container" data-route="fi" hx-get="/graphs/fi?months=12" hx-trigger="load" hx-swap="innerHTML"><span class="spinner">読み込み中</span></div></article>
+            </div>
+        </section>
+        <footer>WealthAudit · ローカル家計データの実績・予測・品質状態を分離して表示します。</footer>
     </main>
     <script>
-        document.addEventListener("click", (event) => {
-            const button = event.target.closest(".btn-group .btn");
-            if (!button) {
-                return;
-            }
+        const rangeQueries = { '1y': '?months=12', 'all': '', 'forecast': '?forecast=60' };
+        let selectedRange = new URLSearchParams(location.search).get('range') || '1y';
+        if (!rangeQueries.hasOwnProperty(selectedRange)) selectedRange = '1y';
 
-            button.closest(".btn-group").querySelectorAll(".btn").forEach((item) => {
-                const selected = item === button;
-                item.classList.toggle("featured", selected);
-                item.setAttribute("aria-pressed", selected ? "true" : "false");
+        function parseAmount(value) {
+            const numeric = String(value || '').replace(/[^0-9+\-.]/g, '');
+            return numeric ? Number(numeric) : null;
+        }
+        function latestRows(containerId) {
+            const rows = [...document.querySelectorAll(`#${containerId} .chart-table tbody tr`)];
+            return rows.filter(row => row.querySelector('.data-status-実績'));
+        }
+        function updateSummary() {
+            const worthRows = latestRows('net-worth-graph');
+            const flowRows = latestRows('cashflow-graph');
+            const warnings = [];
+            if (worthRows.length) {
+                const latest = worthRows.at(-1);
+                const previous = worthRows.at(-2);
+                const cells = latest.querySelectorAll('th,td');
+                const total = cells.at(-1)?.textContent.trim() || '—';
+                document.querySelector('#summary-net-worth').textContent = total;
+                document.querySelector('#summary-month').textContent = `最新実績月 ${cells[0]?.textContent.trim() || '—'}`;
+                if (previous) {
+                    const latestValue = parseAmount(total);
+                    const previousValue = parseAmount(previous.querySelectorAll('th,td').item(previous.querySelectorAll('th,td').length - 1)?.textContent);
+                    document.querySelector('#summary-change').textContent = latestValue != null && previousValue != null ? `${latestValue - previousValue >= 0 ? '+' : ''}${(latestValue - previousValue).toLocaleString('ja-JP',{maximumFractionDigits:1})}万円` : '算定不可';
+                }
+            } else warnings.push('純資産の完了月データを確認できません。');
+            if (flowRows.length) {
+                const latest = flowRows.at(-1);
+                const cells = latest.querySelectorAll('th,td');
+                document.querySelector('#summary-cashflow').textContent = cells.at(-1)?.textContent.trim() || '—';
+            } else warnings.push('収支の完了月データを確認できません。');
+            if (worthRows.length && flowRows.length) {
+                document.querySelector('#summary-health').textContent = warnings.length ? '要確認' : '読込完了';
+                document.querySelector('#summary-updated').textContent = '表とグラフを照合済み';
+            }
+            document.querySelector('#warning-list').innerHTML = (warnings.length ? warnings : ['重大な表示エラーはありません。入力値・計算前提は各表で確認してください。']).map(item => `<li>${item}</li>`).join('');
+        }
+        function loadRange(range) {
+            selectedRange = range;
+            document.querySelectorAll('.range-button').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.range === range)));
+            document.querySelector('#forecast-note').hidden = range !== 'forecast';
+            const params = new URLSearchParams(location.search);
+            if (range === '1y') params.delete('range'); else params.set('range', range);
+            history.replaceState(null, '', `${location.pathname}${params.size ? `?${params}` : ''}`);
+            document.querySelectorAll('[data-route]').forEach(container => {
+                container.innerHTML = '<span class="spinner">読み込み中</span>';
+                htmx.ajax('GET', `/graphs/${container.dataset.route}${rangeQueries[range]}`, { target: `#${container.id}`, swap: 'innerHTML' });
             });
+        }
+        document.querySelectorAll('.range-button').forEach(button => button.addEventListener('click', () => loadRange(button.dataset.range)));
+        document.body.addEventListener('htmx:afterSwap', event => {
+            if (event.detail.target.matches('[data-route]')) updateSummary();
+        });
+        window.addEventListener('load', () => {
+            document.querySelectorAll('.range-button').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.range === selectedRange)));
+            document.querySelector('#forecast-note').hidden = selectedRange !== 'forecast';
+            if (selectedRange !== '1y') window.setTimeout(() => loadRange(selectedRange), 0);
         });
     </script>
 </body>
-
 </html>

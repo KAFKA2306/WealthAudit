@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import html
 import os
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -11,12 +12,51 @@ import plotly.graph_objects as go
 CHART_COLORS = {
     "navy": "#17233f",
     "ink": "#13233f",
-    "muted": "#788291",
-    "gold": "#c99a3a",
-    "sage": "#738b73",
-    "rose": "#b87460",
-    "slate": "#7d8998",
+    "muted": "#667386",
+    "gold": "#a7771f",
+    "sage": "#5d785f",
+    "rose": "#a65343",
+    "slate": "#67778a",
 }
+
+TABLE_COLUMNS: dict[str, tuple[tuple[str, str, str], ...]] = {
+    "net_worth": (
+        ("liquid_assets", "流動資産", "amount"),
+        ("risk_assets", "リスク資産", "amount"),
+        ("pension_assets", "年金資産", "amount"),
+        ("net_worth_total", "純資産合計", "amount"),
+    ),
+    "cashflow": (
+        ("after_tax_income", "税引後収入", "amount"),
+        ("expenditure", "支出", "amount"),
+        ("investment_gain_loss", "投資損益", "amount"),
+        ("total_wealth_flow", "純資産増減フロー", "amount"),
+    ),
+    "allocation": (
+        ("liquid_assets_ratio", "流動資産比率", "percent"),
+        ("risk_assets_ratio", "リスク資産比率", "percent"),
+        ("pension_assets_ratio", "年金資産比率", "percent"),
+    ),
+    "ratios": (
+        ("savings_rate", "貯蓄率", "ratio_percent"),
+        ("risk_asset_ratio", "リスク資産比率", "ratio_percent"),
+    ),
+    "returns": (
+        ("monthly_return", "ポートフォリオ収益率", "ratio_percent"),
+        ("benchmark_return", "ベンチマーク収益率", "ratio_percent"),
+        ("monthly_alpha", "超過収益率", "ratio_percent"),
+    ),
+    "fi": (
+        ("fi_ratio_12m", "FI比率 12か月", "ratio"),
+        ("fi_ratio_48m", "FI比率 48か月", "ratio"),
+        ("fi_ratio_next_12m", "FI比率 予測", "ratio"),
+    ),
+}
+
+
+def last_completed_month() -> str:
+    current = pd.Timestamp.now().to_period("M")
+    return str(current - 1)
 
 
 def total_wealth_flow(df: pd.DataFrame) -> pd.Series:
@@ -80,15 +120,166 @@ class GraphService:
 
     def _data(self, months: Optional[int], forecast: Optional[int]) -> pd.DataFrame:
         frame = self._load_csv("forecast.csv")
-        current = datetime.now().strftime("%Y-%m")
+        cutoff = last_completed_month()
         if forecast:
-            start = (pd.to_datetime(current) - pd.DateOffset(months=12)).strftime("%Y-%m")
-            end = (pd.to_datetime(current) + pd.DateOffset(months=forecast)).strftime("%Y-%m")
-            return frame[(frame["month"] >= start) & (frame["month"] <= end)]
-        actual = frame[frame["month"] <= current]
-        return actual.tail(months) if months else actual
+            start = str(pd.Period(cutoff, freq="M") - 11)
+            end = str(pd.Period(cutoff, freq="M") + forecast)
+            return frame[(frame["month"] >= start) & (frame["month"] <= end)].copy()
+        actual = frame[frame["month"] <= cutoff]
+        return actual.tail(months).copy() if months else actual.copy()
 
-    def _to_html(self, figure: go.Figure) -> str:
+    def dashboard_summary(self) -> dict[str, object]:
+        path = self._csv_path("forecast.csv")
+        warnings: list[str] = []
+        if not os.path.exists(path):
+            return {
+                "net_worth": "利用不可",
+                "cashflow": "利用不可",
+                "month_change": "利用不可",
+                "latest_month": "—",
+                "updated_at": "—",
+                "warnings": ["forecast.csv が存在しません。計算処理を実行してください。"],
+                "data_path": "data/calculated/forecast.csv",
+            }
+
+        frame = self._load_csv("forecast.csv")
+        cutoff = last_completed_month()
+        required = {
+            "month",
+            "liquid_assets",
+            "risk_assets",
+            "pension_assets",
+            "investment_gain_loss",
+        }
+        missing = sorted(required.difference(frame.columns))
+        if missing:
+            warnings.append("必須列が不足: " + ", ".join(missing))
+
+        if "month" in frame and frame["month"].duplicated().any():
+            warnings.append("同一月の重複行があります。")
+        actual = frame[frame["month"] <= cutoff].copy() if "month" in frame else pd.DataFrame()
+        if actual.empty or missing:
+            return {
+                "net_worth": "利用不可",
+                "cashflow": "利用不可",
+                "month_change": "利用不可",
+                "latest_month": "—",
+                "updated_at": datetime.fromtimestamp(os.path.getmtime(path)).strftime("%Y-%m-%d %H:%M"),
+                "warnings": warnings or ["完了月の実績データがありません。"],
+                "data_path": "data/calculated/forecast.csv",
+            }
+
+        latest = actual.iloc[-1]
+        previous = actual.iloc[-2] if len(actual) >= 2 else None
+        latest_total = float(latest[["liquid_assets", "risk_assets", "pension_assets"]].sum())
+        previous_total = (
+            float(previous[["liquid_assets", "risk_assets", "pension_assets"]].sum())
+            if previous is not None
+            else None
+        )
+        flow = float(total_wealth_flow(actual.tail(1)).iloc[-1])
+        latest_month = str(latest["month"])
+        if latest_month < cutoff:
+            warnings.append(f"最新実績は {latest_month} です。完了月 {cutoff} まで更新されていません。")
+        if latest.isna().any():
+            warnings.append("最新行に欠損値があります。")
+        if not warnings:
+            warnings.append("重大な入力・鮮度警告はありません。")
+
+        change = latest_total - previous_total if previous_total is not None else None
+        return {
+            "net_worth": f"{latest_total:,.0f}万円",
+            "cashflow": f"{flow:+,.0f}万円",
+            "month_change": f"{change:+,.0f}万円" if change is not None else "比較月なし",
+            "latest_month": latest_month,
+            "updated_at": datetime.fromtimestamp(os.path.getmtime(path)).strftime("%Y-%m-%d %H:%M"),
+            "warnings": warnings,
+            "data_path": "data/calculated/forecast.csv",
+        }
+
+    def _prepare_table_frame(self, name: str, frame: pd.DataFrame) -> pd.DataFrame:
+        table = frame.copy()
+        if name == "net_worth":
+            table["net_worth_total"] = table[
+                ["liquid_assets", "risk_assets", "pension_assets"]
+            ].sum(axis=1)
+        elif name == "cashflow":
+            table["total_wealth_flow"] = total_wealth_flow(table)
+        elif name == "allocation":
+            total = table[["liquid_assets", "risk_assets", "pension_assets"]].sum(axis=1)
+            denominator = total.where(total != 0)
+            table["liquid_assets_ratio"] = table["liquid_assets"] / denominator * 100
+            table["risk_assets_ratio"] = table["risk_assets"] / denominator * 100
+            table["pension_assets_ratio"] = table["pension_assets"] / denominator * 100
+        return table
+
+    @staticmethod
+    def _format_table_value(value: object, kind: str) -> str:
+        if pd.isna(value):
+            return "—"
+        numeric = float(value)
+        if kind == "amount":
+            return f"{numeric:,.1f}万円"
+        if kind == "percent":
+            return f"{numeric:.1f}%"
+        if kind == "ratio_percent":
+            return f"{numeric * 100:.2f}%"
+        if kind == "ratio":
+            return f"{numeric:.2f}倍"
+        return html.escape(str(value))
+
+    def _table_html(self, name: str, frame: pd.DataFrame) -> str:
+        table = self._prepare_table_frame(name, frame)
+        columns = TABLE_COLUMNS[name]
+        cutoff = last_completed_month()
+        header = "".join(f"<th scope=\"col\">{html.escape(label)}</th>" for _, label, _ in columns)
+        rows: list[str] = []
+        for _, row in table.iterrows():
+            month = html.escape(str(row["month"]))
+            status = "予測" if str(row["month"]) > cutoff else "実績"
+            values = "".join(
+                f"<td>{self._format_table_value(row.get(column), kind)}</td>"
+                for column, _, kind in columns
+            )
+            rows.append(
+                f"<tr><th scope=\"row\">{month}</th><td><span class=\"data-status data-status-{status}\">{status}</span></td>{values}</tr>"
+            )
+        return (
+            '<details class="chart-table"><summary>同じデータを表で確認</summary>'
+            '<div class="chart-table-scroll" tabindex="0" aria-label="グラフのデータ表。横方向にスクロールできます。">'
+            f'<table><thead><tr><th scope="col">月</th><th scope="col">区分</th>{header}</tr></thead>'
+            f'<tbody>{"".join(rows)}</tbody></table></div></details>'
+        )
+
+    def _mark_forecast(self, figure: go.Figure, frame: pd.DataFrame, forecast: Optional[int]) -> None:
+        if not forecast or frame.empty:
+            return
+        cutoff = last_completed_month()
+        future = frame[frame["month"] > cutoff]
+        if future.empty:
+            return
+        first = str(future.iloc[0]["month"])
+        last = str(future.iloc[-1]["month"])
+        figure.add_vrect(
+            x0=first,
+            x1=last,
+            fillcolor="rgba(201,154,58,0.12)",
+            line_width=1,
+            line_dash="dot",
+            line_color=CHART_COLORS["gold"],
+            annotation_text="予測区間",
+            annotation_position="top left",
+        )
+        figure.add_vline(x=cutoff, line_dash="dash", line_color=CHART_COLORS["ink"])
+
+    def _to_html(
+        self,
+        figure: go.Figure,
+        name: str,
+        frame: pd.DataFrame,
+        forecast: Optional[int],
+    ) -> str:
+        self._mark_forecast(figure, frame, forecast)
         figure.update_layout(
             font=dict(family="Manrope, Arial, sans-serif", color=CHART_COLORS["ink"]),
             paper_bgcolor="rgba(0,0,0,0)",
@@ -105,7 +296,7 @@ class GraphService:
                 font=dict(color=CHART_COLORS["muted"], size=12),
             ),
         )
-        return cast(
+        chart = cast(
             str,
             figure.to_html(
                 full_html=False,
@@ -114,6 +305,13 @@ class GraphService:
                 config={"displayModeBar": False, "responsive": True},
             ),
         )
+        boundary = (
+            '<p class="forecast-boundary"><strong>実績と予測を分離:</strong> '
+            f'{html.escape(last_completed_month())} までを実績、それ以降の背景付き領域を予測として表示します。</p>'
+            if forecast
+            else '<p class="forecast-boundary"><strong>表示区分:</strong> 完了月までの実績のみです。</p>'
+        )
+        return f'<div class="chart-output"><div class="chart-visual">{chart}</div>{boundary}{self._table_html(name, frame)}</div>'
 
     def _cached(
         self,
@@ -124,7 +322,8 @@ class GraphService:
     ) -> str:
         key = self._cache_key(name, months, forecast)
         if key not in self._chart_cache:
-            self._chart_cache[key] = self._to_html(builder(self._data(months, forecast)))
+            frame = self._data(months, forecast)
+            self._chart_cache[key] = self._to_html(builder(frame), name, frame, forecast)
         return self._chart_cache[key]
 
     def get_net_worth_chart(
@@ -150,44 +349,13 @@ class GraphService:
     ) -> str:
         def build(df: pd.DataFrame) -> go.Figure:
             figure = go.Figure()
-            figure.add_bar(
-                x=df["month"],
-                y=df["after_tax_income"],
-                name="Income",
-                marker_color=CHART_COLORS["sage"],
-            )
-            figure.add_bar(
-                x=df["month"],
-                y=-df["expenditure"],
-                name="Expenses",
-                marker_color=CHART_COLORS["rose"],
-            )
-            figure.add_bar(
-                x=df["month"],
-                y=df["investment_gain_loss"],
-                name="Investment G/L",
-                marker_color=CHART_COLORS["gold"],
-            )
+            figure.add_bar(x=df["month"], y=df["after_tax_income"], name="Income", marker_color=CHART_COLORS["sage"])
+            figure.add_bar(x=df["month"], y=-df["expenditure"], name="Expenses", marker_color=CHART_COLORS["rose"])
+            figure.add_bar(x=df["month"], y=df["investment_gain_loss"], name="Investment G/L", marker_color=CHART_COLORS["gold"])
             flow = total_wealth_flow(df)
-            figure.add_scatter(
-                x=df["month"],
-                y=flow,
-                name="Total Wealth Flow",
-                mode="lines+markers",
-                line=dict(color=CHART_COLORS["navy"], width=3),
-            )
-            figure.add_scatter(
-                x=df["month"],
-                y=flow.rolling(12, min_periods=1).mean(),
-                name="Total Wealth Flow (12MA)",
-                mode="lines",
-                line=dict(color=CHART_COLORS["gold"], width=3, dash="dash"),
-            )
-            figure.update_layout(
-                title="Monthly Cash Flow (万円)",
-                barmode="relative",
-                yaxis_title="Amount (万円)",
-            )
+            figure.add_scatter(x=df["month"], y=flow, name="Total Wealth Flow", mode="lines+markers", line=dict(color=CHART_COLORS["navy"], width=3))
+            figure.add_scatter(x=df["month"], y=flow.rolling(12, min_periods=1).mean(), name="Total Wealth Flow (12MA)", mode="lines", line=dict(color=CHART_COLORS["gold"], width=3, dash="dash"))
+            figure.update_layout(title="Monthly Cash Flow (万円)", barmode="relative", yaxis_title="Amount (万円)")
             return figure
 
         return self._cached("cashflow", months, forecast, build)
@@ -204,17 +372,8 @@ class GraphService:
                 ("risk_assets", "Risk Assets", CHART_COLORS["gold"]),
                 ("pension_assets", "Pension Assets", CHART_COLORS["sage"]),
             ):
-                figure.add_bar(
-                    x=df["month"],
-                    y=df[column] / denominator * 100,
-                    name=name,
-                    marker_color=color,
-                )
-            figure.update_layout(
-                title="Asset Allocation (%)",
-                barmode="stack",
-                yaxis=dict(title="Ratio (%)", range=[0, 100]),
-            )
+                figure.add_bar(x=df["month"], y=df[column] / denominator * 100, name=name, marker_color=color)
+            figure.update_layout(title="Asset Allocation (%)", barmode="stack", yaxis=dict(title="Ratio (%)", range=[0, 100]))
             return figure
 
         return self._cached("allocation", months, forecast, build)
@@ -224,20 +383,8 @@ class GraphService:
     ) -> str:
         def build(df: pd.DataFrame) -> go.Figure:
             figure = go.Figure()
-            figure.add_scatter(
-                x=df["month"],
-                y=df["savings_rate"] * 100,
-                name="Savings Rate (%)",
-                mode="lines+markers",
-                line=dict(color=CHART_COLORS["navy"], width=3),
-            )
-            figure.add_scatter(
-                x=df["month"],
-                y=df["risk_asset_ratio"] * 100,
-                name="Invested Asset Ratio (%)",
-                mode="lines+markers",
-                line=dict(color=CHART_COLORS["gold"], width=3),
-            )
+            figure.add_scatter(x=df["month"], y=df["savings_rate"] * 100, name="Savings Rate (%)", mode="lines+markers", line=dict(color=CHART_COLORS["navy"], width=3))
+            figure.add_scatter(x=df["month"], y=df["risk_asset_ratio"] * 100, name="Invested Asset Ratio (%)", mode="lines+markers", line=dict(color=CHART_COLORS["gold"], width=3))
             figure.update_layout(title="Financial Ratios (%)", yaxis_title="Ratio (%)")
             return figure
 
@@ -253,16 +400,8 @@ class GraphService:
                 ("benchmark_return", "Benchmark Return (%)", CHART_COLORS["slate"], "dot"),
                 ("monthly_alpha", "Alpha (%)", CHART_COLORS["gold"], None),
             ):
-                figure.add_scatter(
-                    x=df["month"],
-                    y=df[column] * 100,
-                    name=name,
-                    mode="lines+markers",
-                    line=dict(color=color, width=3, dash=dash),
-                )
-            figure.update_layout(
-                title="Investment Performance (%)", yaxis_title="Return (%)"
-            )
+                figure.add_scatter(x=df["month"], y=df[column] * 100, name=name, mode="lines+markers", line=dict(color=color, width=3, dash=dash))
+            figure.update_layout(title="Investment Performance (%)", yaxis_title="Return (%)")
             return figure
 
         return self._cached("returns", months, forecast, build)
@@ -277,16 +416,8 @@ class GraphService:
                 ("fi_ratio_48m", "FI Ratio (48m)", CHART_COLORS["sage"], None),
                 ("fi_ratio_next_12m", "FI Ratio (Projected)", CHART_COLORS["gold"], "dot"),
             ):
-                figure.add_scatter(
-                    x=df["month"],
-                    y=df[column],
-                    name=name,
-                    mode="lines+markers",
-                    line=dict(color=color, width=3, dash=dash),
-                )
-            figure.update_layout(
-                title="Financial Independence Ratio", yaxis_title="Ratio (x Expenses)"
-            )
+                figure.add_scatter(x=df["month"], y=df[column], name=name, mode="lines+markers", line=dict(color=color, width=3, dash=dash))
+            figure.update_layout(title="Financial Independence Ratio", yaxis_title="Ratio (x Expenses)")
             return figure
 
         return self._cached("fi", months, forecast, build)
