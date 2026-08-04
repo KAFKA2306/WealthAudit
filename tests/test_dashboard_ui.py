@@ -48,8 +48,8 @@ class DashboardUiTest(unittest.TestCase):
     @patch("src.use_cases.graph_service.last_completed_month", return_value="2025-02")
     def test_chart_includes_actual_forecast_boundary_and_table(self, _mock) -> None:
         output = self.service.get_net_worth_chart(forecast=12)
-        self.assertIn("予測区間", output)
         self.assertIn("forecast-boundary", output)
+        self.assertIn("実績と予測を分離", output)
         self.assertIn("同じデータを表で確認", output)
         self.assertIn("data-status-実績", output)
         self.assertIn("data-status-予測", output)
