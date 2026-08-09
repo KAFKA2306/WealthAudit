@@ -322,8 +322,24 @@ def test_web_accepts_native_currency_for_multi_account(
     pd.DataFrame(
         columns=["month", "account_id", "asset_class", "balance"]
     ).to_csv(tmp_path / "data" / "input" / "assets.csv", index=False)
+    pd.DataFrame(
+        [{"month": "2026-08", "usd_jpy": 150, "eur_jpy": 160, "sp500": 6000}]
+    ).to_csv(tmp_path / "data" / "input" / "market.csv", index=False)
+
+    def complete_monthly_close(command: list[str], **kwargs) -> None:
+        calculated = tmp_path / "data" / "calculated"
+        if command == ["task", "run"]:
+            for filename in ("cashflow.csv", "balance_sheet.csv", "metrics.csv"):
+                pd.DataFrame([{"month": "2026-08"}]).to_csv(
+                    calculated / filename, index=False
+                )
+        elif command == ["task", "audit:recalculate"]:
+            pd.DataFrame(
+                columns=["file", "key", "column", "before", "after", "delta"]
+            ).to_csv(calculated / "recalculation_diff.csv", index=False)
+
     monkeypatch.setattr(
-        "src.infrastructure.web.subprocess.run", lambda *args, **kwargs: None
+        "src.infrastructure.web.subprocess.run", complete_monthly_close
     )
 
     response = create_app().test_client().post(
