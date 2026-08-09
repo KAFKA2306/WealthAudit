@@ -10,6 +10,7 @@ on:
       - "src/infrastructure/web.py"
       - "tests/test_monthly_close.py"
       - "tests/test_web_input_safety.py"
+      - "tests/test_issue_2_financial_consistency.py"
       - "Taskfile.yml"
       - "docs/monthly-close.md"
       - ".github/workflows/monthly-close.yml"
@@ -21,6 +22,7 @@ on:
       - "src/infrastructure/web.py"
       - "tests/test_monthly_close.py"
       - "tests/test_web_input_safety.py"
+      - "tests/test_issue_2_financial_consistency.py"
       - "Taskfile.yml"
       - "docs/monthly-close.md"
       - ".github/workflows/monthly-close.yml"
@@ -58,6 +60,7 @@ jobs:
           src/infrastructure/web.py
           tests/test_monthly_close.py
           tests/test_web_input_safety.py
+          tests/test_issue_2_financial_consistency.py
 
       - name: Run full regression suite
         run: uv run pytest -q
