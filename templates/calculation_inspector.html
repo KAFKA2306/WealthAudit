@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Calculation Inspector | WealthAudit</title>
+<style>
+body{margin:0;padding:24px;background:#fbf8f1;color:#13233f;font:16px/1.65 system-ui,-apple-system,"Segoe UI",sans-serif}main{max-width:1100px;margin:auto}a{color:#17233f}.top{display:flex;justify-content:space-between;gap:16px;align-items:center}.card{margin:18px 0;padding:20px;border:1px solid rgba(19,35,63,.16);border-radius:18px;background:#fff;box-shadow:0 12px 40px rgba(23,35,63,.07)}code{padding:3px 6px;border-radius:6px;background:#f2f4f7}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}.formula{border-left:5px solid #a7771f}.label{color:#667386;font-size:13px;font-weight:700}.value{font-size:22px;font-weight:850}.inputs{margin:8px 0 0;padding-left:20px}.empty{padding:16px;border-radius:12px;background:#fff6df}@media(max-width:650px){body{padding:12px}.top{align-items:flex-start;flex-direction:column}}</style>
+</head>
+<body><main>
+<div class="top"><div><p class="label">WealthAudit / auditability</p><h1>Calculation Inspector</h1><p>表示値を、同じ正準Formula Manifestの式・入力・単位・参照元まで逆引きします。</p></div><a href="/">← ダッシュボード</a></div>
+{% if traces %}<h2>最新実績月 {{ month }}</h2><div class="grid">
+{% for trace in traces %}<section class="card formula"><div class="label">{{ trace.formula.id }} · {{ trace.formula.unit }}</div><h3>{{ trace.formula.label }}</h3><p><code>{{ trace.formula.formula }}</code></p><div class="value">{{ trace.rounded_result }}</div><p class="label">丸め前: {{ trace.raw_result }}</p><ul class="inputs">{% for name,value in trace.inputs.items() %}<li><code>{{ name }}</code> = {{ value }}</li>{% endfor %}</ul><p class="label">source: {{ trace.formula.source }}</p></section>{% endfor %}
+</div>{% else %}<div class="empty">計算済みCSVがまだないため、現在値の追跡は表示できません。下のManifestは確認できます。</div>{% endif %}
+<h2>Formula Manifest</h2><div class="grid">{% for spec in manifest %}<section class="card"><div class="label">{{ spec.id }} · {{ spec.unit }}</div><h3>{{ spec.label }}</h3><p><code>{{ spec.formula }}</code></p><p>inputs: {{ spec.inputs|join(', ') }}</p><p class="label">source: {{ spec.source }}</p></section>{% endfor %}</div>
+</main></body></html>
