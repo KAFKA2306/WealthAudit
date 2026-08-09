@@ -1,20 +1,35 @@
 # Balance Sheet and Cash Flow Logic
 
-This document describes the logic for calculating the balance sheet and cash flow statements.
+The canonical calculation contract is `src/use_cases/calculators/formula_manifest.py`.
+This document intentionally does not duplicate executable equations. Formula text, input names,
+units, and source references are rendered from that manifest into the Calculation Inspector.
 
-## Cash Flow Calculation (`cash_flow.py`)
+## Cash Flow
 
-The cash flow calculation is performed by the `CashFlowCalculator`.
+`CashFlowCalculator` aggregates monthly income, pension contributions, and expenditure, then evaluates:
 
-1.  **Aggregation**: Incomes and expenses are aggregated by month.
-2.  **Net Savings**: For each month, net savings are calculated as `total income - total expenses`.
-3.  **Statement Generation**: A `CashFlowStatement` is created for each month, containing the total income, total expenses, and net savings.
+- `net_savings`
+- `net_worth_contribution`
 
-## Balance Sheet Calculation (`balance_sheet.py`)
+through the canonical manifest evaluator.
 
-The balance sheet calculation is performed by the `BalanceSheetCalculator`.
+## Balance Sheet
 
-1.  **Asset Grouping**: Assets are grouped by month.
-2.  **Asset Classification**: For each month, the total balance of liquid assets, risk assets, and pension assets is calculated based on the account's risk classification and asset class.
-3.  **Investment Gain/Loss**: The investment gain or loss for the month is calculated. This is the change in total assets minus the net savings from the cash flow statement.
-4.  **Statement Generation**: A `BalanceSheet` is created for each month, containing the balances of liquid, risk, and pension assets, as well as the total financial assets and the investment gain/loss.
+`BalanceSheetCalculator` values and classifies assets, then evaluates:
+
+- `total_financial_assets`
+- `investment_gain_loss`
+- `return_base_assets`
+
+through the same manifest evaluator. `investment_gain_loss` is only evaluated for consecutive months;
+otherwise the existing zero/default behavior is preserved.
+
+## Inspection and audit
+
+Open `/static/calculation-inspector.html` while the local Flask app is running. The page itself is a
+generated artifact from the manifest and uses the existing GraphService endpoints for current
+calculated tables. It performs no accounting arithmetic in HTML/JavaScript.
+
+`tests/test_formula_manifest.py` locks the causal chain, pre-round values, zero-denominator behavior,
+and exact generated-HTML synchronization. `.github/workflows/formula-manifest.yml` regenerates the
+Inspector and fails when the checked-in artifact differs from the manifest.
