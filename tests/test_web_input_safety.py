@@ -28,6 +28,34 @@ def copy_templates(tmp_path: Path) -> None:
     shutil.copytree(repo_root / "templates", tmp_path / "templates")
 
 
+def write_market(input_dir: Path, month: str) -> None:
+    write_csv(
+        input_dir / "market.csv",
+        [{"month": month, "usd_jpy": 150, "eur_jpy": 160, "sp500": 6000}],
+        ["month", "usd_jpy", "eur_jpy", "sp500"],
+    )
+
+
+def successful_tasks(calculated_dir: Path, month: str, calls: list[list[str]]):
+    def succeed(
+        cmd: list[str], check: bool, cwd: Path | None = None
+    ) -> subprocess.CompletedProcess[str]:
+        calls.append(cmd)
+        calculated_dir.mkdir(parents=True, exist_ok=True)
+        if cmd == ["task", "run"]:
+            for filename in ("cashflow.csv", "balance_sheet.csv", "metrics.csv"):
+                write_csv(calculated_dir / filename, [{"month": month}], ["month"])
+        elif cmd == ["task", "audit:recalculate"]:
+            write_csv(
+                calculated_dir / "recalculation_diff.csv",
+                [],
+                ["file", "key", "column", "before", "after", "delta"],
+            )
+        return subprocess.CompletedProcess(cmd, 0)
+
+    return succeed
+
+
 def test_input_get_works_without_calculated_forecast_csv() -> None:
     response = create_app().test_client().get("/input")
 
@@ -147,9 +175,12 @@ def test_input_post_task_failure_restores_original_csvs(tmp_path, monkeypatch) -
         original_assets,
         ["month", "account_id", "asset_class", "balance"],
     )
+    write_market(input_dir, "2026-06")
     write_csv(calculated_dir / "forecast.csv", [{"month": "2026-06"}], ["month"])
 
-    def fail_on_export(cmd: list[str], check: bool) -> subprocess.CompletedProcess[str]:
+    def fail_on_export(
+        cmd: list[str], check: bool, cwd: Path | None = None
+    ) -> subprocess.CompletedProcess[str]:
         if cmd == ["task", "run"]:
             write_csv(
                 calculated_dir / "forecast.csv",
@@ -187,6 +218,7 @@ def test_input_post_task_failure_restores_original_csvs(tmp_path, monkeypatch) -
     assert pd.read_csv(calculated_dir / "forecast.csv").to_dict("records") == [
         {"month": "2026-06"}
     ]
+    assert not (tmp_path / "data" / "state" / "monthly-close.json").exists()
 
 
 def test_input_post_blank_suggested_rows_do_not_overwrite_existing_rows(
@@ -194,6 +226,7 @@ def test_input_post_blank_suggested_rows_do_not_overwrite_existing_rows(
 ) -> None:
     monkeypatch.chdir(tmp_path)
     input_dir = tmp_path / "data" / "input"
+    calculated_dir = tmp_path / "data" / "calculated"
 
     original_income = [{"month": "2026-06", "account_id": "salary", "amount": 100}]
     original_expense = [{"month": "2026-06", "method_id": "card", "amount": 40}]
@@ -216,14 +249,13 @@ def test_input_post_blank_suggested_rows_do_not_overwrite_existing_rows(
         original_assets,
         ["month", "account_id", "asset_class", "balance"],
     )
+    write_market(input_dir, "2026-06")
 
     calls: list[list[str]] = []
-
-    def succeed(cmd: list[str], check: bool) -> subprocess.CompletedProcess[str]:
-        calls.append(cmd)
-        return subprocess.CompletedProcess(cmd, 0)
-
-    monkeypatch.setattr("src.infrastructure.web.subprocess.run", succeed)
+    monkeypatch.setattr(
+        "src.infrastructure.web.subprocess.run",
+        successful_tasks(calculated_dir, "2026-06", calls),
+    )
 
     response = (
         create_app()
@@ -244,7 +276,12 @@ def test_input_post_blank_suggested_rows_do_not_overwrite_existing_rows(
     )
 
     assert response.status_code == 302
-    assert calls == [["task", "run"], ["task", "export"], ["task", "forecast"]]
+    assert calls == [
+        ["task", "run"],
+        ["task", "export"],
+        ["task", "forecast"],
+        ["task", "audit:recalculate"],
+    ]
     assert pd.read_csv(input_dir / "income.csv").to_dict("records") == original_income
     assert pd.read_csv(input_dir / "expense.csv").to_dict("records") == original_expense
     assert pd.read_csv(input_dir / "assets.csv").to_dict("records") == original_assets
@@ -253,6 +290,7 @@ def test_input_post_blank_suggested_rows_do_not_overwrite_existing_rows(
 def test_input_post_success_writes_expected_rows(tmp_path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
     input_dir = tmp_path / "data" / "input"
+    calculated_dir = tmp_path / "data" / "calculated"
 
     write_csv(
         input_dir / "income.csv",
@@ -288,14 +326,13 @@ def test_input_post_success_writes_expected_rows(tmp_path, monkeypatch) -> None:
         ],
         ["month", "account_id", "asset_class", "balance"],
     )
+    write_market(input_dir, "2026-06")
 
     calls: list[list[str]] = []
-
-    def succeed(cmd: list[str], check: bool) -> subprocess.CompletedProcess[str]:
-        calls.append(cmd)
-        return subprocess.CompletedProcess(cmd, 0)
-
-    monkeypatch.setattr("src.infrastructure.web.subprocess.run", succeed)
+    monkeypatch.setattr(
+        "src.infrastructure.web.subprocess.run",
+        successful_tasks(calculated_dir, "2026-06", calls),
+    )
 
     response = (
         create_app()
@@ -316,7 +353,12 @@ def test_input_post_success_writes_expected_rows(tmp_path, monkeypatch) -> None:
     )
 
     assert response.status_code == 302
-    assert calls == [["task", "run"], ["task", "export"], ["task", "forecast"]]
+    assert calls == [
+        ["task", "run"],
+        ["task", "export"],
+        ["task", "forecast"],
+        ["task", "audit:recalculate"],
+    ]
     assert pd.read_csv(input_dir / "income.csv").to_dict("records") == [
         {"month": "2026-05", "account_id": "salary", "amount": 100},
         {"month": "2026-06", "account_id": "salary", "amount": 999},
@@ -339,3 +381,4 @@ def test_input_post_success_writes_expected_rows(tmp_path, monkeypatch) -> None:
             "balance": 777,
         },
     ]
+    assert (tmp_path / "data" / "state" / "monthly-close.json").is_file()
