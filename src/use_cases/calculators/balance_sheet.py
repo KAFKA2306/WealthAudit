@@ -3,6 +3,7 @@ from typing import Dict, List, Optional
 
 from src.constants import AccountId, AccountType, AssetClassId
 from src.domain.entities.models import Account, Asset, AssetClass, Market, Month
+from src.use_cases.calculators.formula_manifest import evaluate_formula
 from src.use_cases.dtos.output import BalanceSheet, CashFlowStatement
 from src.use_cases.valuation import is_consecutive_month, value_assets
 
@@ -55,7 +56,14 @@ class BalanceSheetCalculator:
                 else:
                     liquid_total += valuation.jpy_value
 
-            total_assets = liquid_total + risk_total + pension_total
+            total_assets = evaluate_formula(
+                "total_financial_assets",
+                {
+                    "liquid_assets": liquid_total,
+                    "risk_assets": risk_total,
+                    "pension_assets": pension_total,
+                },
+            )
             cashflow = cf_map.get(month)
             contribution = cashflow.net_worth_contribution if cashflow else 0
 
@@ -64,14 +72,20 @@ class BalanceSheetCalculator:
             if previous_statement is not None and is_consecutive_month(
                 str(previous_statement.month), month
             ):
-                gain = (
-                    total_assets
-                    - previous_statement.total_financial_assets
-                    - contribution
+                gain = evaluate_formula(
+                    "investment_gain_loss",
+                    {
+                        "current_total_financial_assets": total_assets,
+                        "previous_total_financial_assets": previous_statement.total_financial_assets,
+                        "net_worth_contribution": contribution,
+                    },
                 )
-                return_base_assets = (
-                    previous_statement.risk_assets
-                    + previous_statement.pension_assets
+                return_base_assets = evaluate_formula(
+                    "return_base_assets",
+                    {
+                        "previous_risk_assets": previous_statement.risk_assets,
+                        "previous_pension_assets": previous_statement.pension_assets,
+                    },
                 )
 
             statement = BalanceSheet(
