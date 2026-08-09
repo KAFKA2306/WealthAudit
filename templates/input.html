@@ -24,6 +24,7 @@
   <nav><strong>WealthAudit</strong><a class="pill" href="/">ダッシュボード</a></nav>
   <h1>月次入力</h1>
   <form method="POST" action="/input">
+    <input type="hidden" name="csrf_token" value="{{ wealthaudit_csrf_token() }}">
     <section>
       <h2>対象月</h2>
       <input type="month" name="target_month" value="{{ target_month }}" required>
