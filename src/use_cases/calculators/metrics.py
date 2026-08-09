@@ -6,6 +6,7 @@ from typing import Iterable, List
 
 from src.constants import PORTFOLIO_EXPECTED_ANNUAL_RETURN
 from src.domain.entities.models import Market, Month
+from src.use_cases.calculators.formula_manifest import evaluate_formula
 from src.use_cases.dtos.output import BalanceSheet, CashFlowStatement, FinancialMetrics
 from src.use_cases.valuation import previous_month
 
@@ -52,10 +53,13 @@ class MetricsCalculator:
             bs = bs_map[month]
             previous = previous_month(month)
 
-            if bs.return_base_assets > 0:
-                raw_return = bs.investment_gain_loss / bs.return_base_assets
-            else:
-                raw_return = math.nan
+            raw_return = evaluate_formula(
+                "raw_monthly_return",
+                {
+                    "investment_gain_loss": bs.investment_gain_loss,
+                    "return_base_assets": bs.return_base_assets,
+                },
+            )
             raw_returns[month] = raw_return
 
             current_market = market_map.get(month)
@@ -75,10 +79,9 @@ class MetricsCalculator:
             benchmark_return = _geometric_mean(
                 raw_benchmarks.get(item, math.nan) for item in trailing_months
             )
-            alpha = (
-                monthly_return - benchmark_return
-                if math.isfinite(monthly_return) and math.isfinite(benchmark_return)
-                else math.nan
+            alpha = evaluate_formula(
+                "monthly_alpha",
+                {"monthly_return": monthly_return, "benchmark_return": benchmark_return},
             )
 
             income_12m = sum(
@@ -107,20 +110,42 @@ class MetricsCalculator:
                 if item in bs_map
             )
 
-            savings_rate = savings_12m / income_12m if income_12m else 0.0
-            risk_ratio = (
-                (bs.risk_assets + bs.pension_assets) / bs.total_financial_assets
-                if bs.total_financial_assets
-                else 0.0
+            risk_and_pension_assets = bs.risk_assets + bs.pension_assets
+            savings_rate = evaluate_formula(
+                "savings_rate_12m",
+                {
+                    "net_savings_12m": savings_12m,
+                    "after_tax_income_12m": income_12m,
+                },
             )
-            fi_12 = gain_12m / expense_12m if expense_12m else 0.0
-            fi_48 = gain_48m / expense_48m if expense_48m else 0.0
-            fi_next = (
-                (bs.risk_assets + bs.pension_assets)
-                * PORTFOLIO_EXPECTED_ANNUAL_RETURN
-                / expense_12m
-                if expense_12m
-                else 0.0
+            risk_ratio = evaluate_formula(
+                "risk_asset_ratio",
+                {
+                    "risk_and_pension_assets": risk_and_pension_assets,
+                    "total_financial_assets": bs.total_financial_assets,
+                },
+            )
+            fi_12 = evaluate_formula(
+                "fi_ratio_12m",
+                {
+                    "investment_gain_loss_12m": gain_12m,
+                    "expenditure_12m": expense_12m,
+                },
+            )
+            fi_48 = evaluate_formula(
+                "fi_ratio_48m",
+                {
+                    "investment_gain_loss_48m": gain_48m,
+                    "expenditure_48m": expense_48m,
+                },
+            )
+            fi_next = evaluate_formula(
+                "fi_ratio_next_12m",
+                {
+                    "risk_and_pension_assets": risk_and_pension_assets,
+                    "expected_annual_return": PORTFOLIO_EXPECTED_ANNUAL_RETURN,
+                    "expenditure_12m": expense_12m,
+                },
             )
 
             metrics.append(
