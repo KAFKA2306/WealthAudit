@@ -4,9 +4,7 @@ from __future__ import annotations
 
 import datetime
 import os
-import shutil
 import subprocess
-import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -14,14 +12,15 @@ import pandas as pd
 from dateutil.relativedelta import relativedelta  # type: ignore
 from flask import Flask, Response, redirect, render_template, request, url_for
 
+from src.infrastructure.monthly_close import FilesystemMonthlyClosePort
 from src.use_cases.graph_service import GraphService
+from src.use_cases.monthly_close import MonthlyCloseError, MonthlyCloseWorkflow
 
 
 def create_app() -> Flask:
     app = Flask(__name__, template_folder=os.path.join(os.getcwd(), "templates"))
     root_dir = Path(os.getcwd())
     input_dir = root_dir / "data" / "input"
-    calculated_dir = root_dir / "data" / "calculated"
     graph_service = GraphService(data_dir=str(root_dir))
 
     def warm_graph_cache() -> None:
@@ -52,53 +51,8 @@ def create_app() -> Flask:
             current = current[current["month"] != target_month]
         return pd.concat([current, new_frame], ignore_index=True)
 
-    def write_staged_inputs(
-        updates: dict[str, pd.DataFrame], temp_root: Path
-    ) -> Path | None:
-        if not updates:
-            return None
-        staged = temp_root / "input"
-        if input_dir.exists():
-            shutil.copytree(input_dir, staged)
-        else:
-            staged.mkdir(parents=True)
-        for filename, frame in updates.items():
-            frame.to_csv(staged / filename, index=False)
-        return staged
-
-    def snapshot_calculated(temp_root: Path) -> Path | None:
-        if not calculated_dir.exists():
-            return None
-        snapshot = temp_root / "calculated"
-        shutil.copytree(calculated_dir, snapshot)
-        return snapshot
-
-    def restore_calculated(snapshot: Path | None) -> None:
-        if calculated_dir.exists():
-            shutil.rmtree(calculated_dir)
-        if snapshot is not None:
-            shutil.copytree(snapshot, calculated_dir)
-
-    def apply_staged_inputs(staged: Path | None, temp_root: Path) -> Path | None:
-        if staged is None:
-            return None
-        backup = temp_root / "input.original"
-        input_dir.parent.mkdir(parents=True, exist_ok=True)
-        if input_dir.exists():
-            input_dir.rename(backup)
-        staged.rename(input_dir)
-        return backup
-
-    def restore_inputs(backup: Path | None) -> None:
-        if backup is None:
-            return
-        if input_dir.exists():
-            shutil.rmtree(input_dir)
-        backup.rename(input_dir)
-
-    def run_recalculation() -> None:
-        for task in ("run", "export", "forecast"):
-            subprocess.run(["task", task], check=True)
+    def run_task(command: tuple[str, ...], cwd: Path) -> None:
+        subprocess.run(list(command), cwd=cwd, check=True)
 
     def accounts_frame() -> pd.DataFrame:
         path = root_dir / "master" / "accounts.csv"
@@ -113,6 +67,9 @@ def create_app() -> Flask:
         accounts = accounts_frame()
         if request.method == "POST":
             target_month = request.form.get("target_month")
+            if not target_month:
+                return "target_month is required", 400
+
             new_income = [
                 {"month": target_month, "account_id": account, "amount": int(amount)}
                 for account, amount in zip(
@@ -180,10 +137,16 @@ def create_app() -> Flask:
                 filename: frame
                 for filename, frame in {
                     "income.csv": replace_month(
-                        "income.csv", target_month, new_income, ["month", "account_id", "amount"]
+                        "income.csv",
+                        target_month,
+                        new_income,
+                        ["month", "account_id", "amount"],
                     ),
                     "expense.csv": replace_month(
-                        "expense.csv", target_month, new_expenses, ["month", "method_id", "amount"]
+                        "expense.csv",
+                        target_month,
+                        new_expenses,
+                        ["month", "method_id", "amount"],
                     ),
                     "assets.csv": replace_month(
                         "assets.csv", target_month, new_assets, asset_columns
@@ -192,25 +155,19 @@ def create_app() -> Flask:
                 if frame is not None
             }
 
-            with tempfile.TemporaryDirectory(prefix="wealthaudit-input-") as temp_name:
-                temp_root = Path(temp_name)
-                staged = write_staged_inputs(updates, temp_root)
-                calculated_snapshot = snapshot_calculated(temp_root)
-                backup = apply_staged_inputs(staged, temp_root)
-                try:
-                    run_recalculation()
-                except subprocess.CalledProcessError as exc:
-                    restore_inputs(backup)
-                    restore_calculated(calculated_snapshot)
-                    graph_service.clear_cache()
-                    return (
-                        "Recalculation failed. Input CSV files were restored; "
-                        f"failed command: {' '.join(exc.cmd)}",
-                        500,
+            try:
+                MonthlyCloseWorkflow().execute(
+                    FilesystemMonthlyClosePort(
+                        repo_root=root_dir,
+                        month=target_month,
+                        updates=updates,
+                        command_runner=run_task,
                     )
-                else:
-                    if backup is not None and backup.exists():
-                        shutil.rmtree(backup)
+                )
+            except MonthlyCloseError as exc:
+                graph_service.clear_cache()
+                app.logger.error("Monthly close failed: %s", exc)
+                return f"Recalculation failed. Monthly close was rolled back: {exc}", 500
 
             graph_service.clear_cache()
             warm_graph_cache()
@@ -237,34 +194,46 @@ def create_app() -> Flask:
         )
         recent_months = sorted(income["month"].unique())[-6:] if not income.empty else []
         recent_income = income[income["month"].isin(recent_months)] if recent_months else income
-        income_items = [
-            {
-                "account_id": account,
-                "name": account_names.get(account, account),
-                "suggested_amount": int(group["amount"].mean()),
-            }
-            for account, group in recent_income.groupby("account_id")
-        ] if not recent_income.empty else []
+        income_items = (
+            [
+                {
+                    "account_id": account,
+                    "name": account_names.get(account, account),
+                    "suggested_amount": int(group["amount"].mean()),
+                }
+                for account, group in recent_income.groupby("account_id")
+            ]
+            if not recent_income.empty
+            else []
+        )
 
         methods_path = root_dir / "master" / "payment_methods.csv"
         methods = pd.read_csv(methods_path) if methods_path.exists() else pd.DataFrame()
         card_items: list[dict[str, Any]] = []
         other_expense_items: list[dict[str, Any]] = []
         if not methods.empty:
-            recent_expense_months = sorted(expense["month"].unique())[-6:] if not expense.empty else []
-            recent_expense = expense[expense["month"].isin(recent_expense_months)] if recent_expense_months else expense
+            recent_expense_months = (
+                sorted(expense["month"].unique())[-6:] if not expense.empty else []
+            )
+            recent_expense = (
+                expense[expense["month"].isin(recent_expense_months)]
+                if recent_expense_months
+                else expense
+            )
             for _, method in methods.iterrows():
                 values = (
-            recent_expense[
-                recent_expense["method_id"] == method["method_id"]
-            ]
-            if "method_id" in recent_expense.columns
-            else pd.DataFrame(columns=["amount"])
-        )
+                    recent_expense[
+                        recent_expense["method_id"] == method["method_id"]
+                    ]
+                    if "method_id" in recent_expense.columns
+                    else pd.DataFrame(columns=["amount"])
+                )
                 item = {
                     "method_id": method["method_id"],
                     "name": method["name"],
-                    "suggested_amount": int(values["amount"].mean()) if not values.empty else 0,
+                    "suggested_amount": int(values["amount"].mean())
+                    if not values.empty
+                    else 0,
                 }
                 settlement_day = int(method.get("settlement_day", 0) or 0)
                 (card_items if settlement_day >= 1 else other_expense_items).append(item)
@@ -298,9 +267,12 @@ def create_app() -> Flask:
                 ]
                 if "native_currency" in history and currency and currency != "multi":
                     history = history[
-                        history["native_currency"].fillna(currency).astype(str) == currency
+                        history["native_currency"].fillna(currency).astype(str)
+                        == currency
                     ]
-                history_by_month = history.groupby("month")[balance_column].sum().sort_index()
+                history_by_month = (
+                    history.groupby("month")[balance_column].sum().sort_index()
+                )
                 if len(history_by_month) >= 2:
                     values = history_by_month.to_numpy(dtype=float)
                     slope = (values[-1] - values[0]) / len(values)
@@ -313,7 +285,9 @@ def create_app() -> Flask:
                         "name": account_names.get(account_id, account_id),
                         "asset_class": asset_row["asset_class"],
                         "native_currency": "" if currency == "multi" else currency,
-                        "suggested_balance": int(suggested) if suggested.is_integer() else suggested,
+                        "suggested_balance": int(suggested)
+                        if suggested.is_integer()
+                        else suggested,
                     }
                 )
 
