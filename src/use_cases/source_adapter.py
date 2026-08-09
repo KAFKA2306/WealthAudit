@@ -73,6 +73,23 @@ class SourceAdapter(ABC):
     ) -> Mapping[str, Sequence[Mapping[str, Any]]]:
         """Map source fields to canonical WealthAudit input tables."""
 
+    def validate(
+        self,
+        tables: Mapping[str, Sequence[Mapping[str, Any]]],
+        *,
+        target_month: str,
+        known_accounts: set[str],
+        known_payment_methods: set[str],
+    ) -> dict[str, tuple[Mapping[str, Any], ...]]:
+        """Validate canonical output before handoff to the monthly workflow."""
+
+        return validate_normalized_tables(
+            tables,
+            target_month=target_month,
+            known_accounts=known_accounts,
+            known_payment_methods=known_payment_methods,
+        )
+
     def run(
         self,
         target_month: str,
@@ -85,7 +102,7 @@ class SourceAdapter(ABC):
         raw = self.fetch(auth_context, target_month)
         records = self.parse(raw)
         normalized = self.normalize(records, target_month)
-        tables = validate_normalized_tables(
+        tables = self.validate(
             normalized,
             target_month=target_month,
             known_accounts=known_accounts,
