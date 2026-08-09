@@ -1,0 +1,45 @@
+name: Validate source adapter contract
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/use_cases/source_adapter.py"
+      - "tests/test_source_adapter.py"
+      - "docs/source-adapters.md"
+      - ".github/workflows/source-adapter.yml"
+      - ".gitignore"
+  pull_request:
+    paths:
+      - "src/use_cases/source_adapter.py"
+      - "tests/test_source_adapter.py"
+      - "docs/source-adapters.md"
+      - ".github/workflows/source-adapter.yml"
+      - ".gitignore"
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --extra dev
+      - name: Compile adapter
+        run: uv run python -m py_compile src/use_cases/source_adapter.py tests/test_source_adapter.py
+      - name: Adapter tests
+        run: uv run pytest -q tests/test_source_adapter.py
+      - name: Full regression suite
+        run: uv run pytest -q
+      - name: Reject tracked raw or secret-like runtime artifacts
+        run: |
+          if git ls-files | grep -E '(^data/|(^|/)(cookies?|tokens?|raw|staging)(/|$)|\.html\.dump$)' ; then
+            echo "Tracked runtime/raw artifact detected" >&2
+            exit 1
+          fi
+      - name: Cleanup generated caches
+        run: rm -rf .pytest_cache .ruff_cache && find . -type d -name __pycache__ -prune -exec rm -rf {} +
+      - name: Repository clean gate
+        run: test -z "$(git status --porcelain)"
