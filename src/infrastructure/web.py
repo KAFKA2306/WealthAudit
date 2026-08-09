@@ -13,12 +13,14 @@ from dateutil.relativedelta import relativedelta  # type: ignore
 from flask import Flask, Response, redirect, render_template, request, url_for
 
 from src.infrastructure.monthly_close import FilesystemMonthlyClosePort
+from src.infrastructure.web_security import apply_web_security
 from src.use_cases.graph_service import GraphService
 from src.use_cases.monthly_close import MonthlyCloseError, MonthlyCloseWorkflow
 
 
 def create_app() -> Flask:
     app = Flask(__name__, template_folder=os.path.join(os.getcwd(), "templates"))
+    apply_web_security(app)
     root_dir = Path(os.getcwd())
     input_dir = root_dir / "data" / "input"
     graph_service = GraphService(data_dir=str(root_dir))
@@ -167,7 +169,7 @@ def create_app() -> Flask:
             except MonthlyCloseError as exc:
                 graph_service.clear_cache()
                 app.logger.error("Monthly close failed: %s", exc)
-                return f"Recalculation failed. Monthly close was rolled back: {exc}", 500
+                return "Recalculation failed. Monthly close was rolled back.", 500
 
             graph_service.clear_cache()
             warm_graph_cache()
@@ -331,7 +333,7 @@ def create_app() -> Flask:
 
 
 def main() -> None:
-    create_app().run(debug=True, port=5000)
+    create_app().run(host="127.0.0.1", port=5000, debug=False)
 
 
 if __name__ == "__main__":
