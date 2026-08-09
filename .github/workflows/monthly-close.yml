@@ -1,0 +1,69 @@
+name: Validate monthly close state machine
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/use_cases/monthly_close.py"
+      - "src/infrastructure/monthly_close.py"
+      - "src/infrastructure/monthly_close_cli.py"
+      - "src/infrastructure/web.py"
+      - "tests/test_monthly_close.py"
+      - "tests/test_web_input_safety.py"
+      - "Taskfile.yml"
+      - "docs/monthly-close.md"
+      - ".github/workflows/monthly-close.yml"
+  pull_request:
+    paths:
+      - "src/use_cases/monthly_close.py"
+      - "src/infrastructure/monthly_close.py"
+      - "src/infrastructure/monthly_close_cli.py"
+      - "src/infrastructure/web.py"
+      - "tests/test_monthly_close.py"
+      - "tests/test_web_input_safety.py"
+      - "Taskfile.yml"
+      - "docs/monthly-close.md"
+      - ".github/workflows/monthly-close.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --frozen --extra dev
+
+      - name: Compile monthly close entry points
+        run: >-
+          uv run python -m py_compile
+          src/use_cases/monthly_close.py
+          src/infrastructure/monthly_close.py
+          src/infrastructure/monthly_close_cli.py
+          src/infrastructure/web.py
+          tests/test_monthly_close.py
+          tests/test_web_input_safety.py
+
+      - name: Run full regression suite
+        run: uv run pytest -q
+
+      - name: Verify repository is clean
+        run: |
+          find . -type d -name __pycache__ -prune -exec rm -rf {} +
+          rm -rf .pytest_cache .ruff_cache .mypy_cache
+          test -z "$(git status --porcelain)"
