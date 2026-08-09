@@ -1,0 +1,69 @@
+name: Validate web security boundary
+
+on:
+  pull_request:
+    paths:
+      - "src/infrastructure/web.py"
+      - "src/infrastructure/web_security.py"
+      - "templates/input.html"
+      - "tests/conftest.py"
+      - "tests/test_web_security.py"
+      - "tests/test_web_input_safety.py"
+      - ".github/workflows/web-security.yml"
+  push:
+    branches: [main]
+    paths:
+      - "src/infrastructure/web.py"
+      - "src/infrastructure/web_security.py"
+      - "templates/input.html"
+      - "tests/conftest.py"
+      - "tests/test_web_security.py"
+      - "tests/test_web_input_safety.py"
+      - ".github/workflows/web-security.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --frozen --extra dev
+
+      - name: Compile web boundary
+        run: uv run python -m py_compile src/infrastructure/web.py src/infrastructure/web_security.py tests/test_web_security.py
+
+      - name: Reject unsafe Flask development defaults
+        run: |
+          ! grep -R "run(debug=True" -n src
+          grep -F 'host="127.0.0.1"' src/infrastructure/web.py
+
+      - name: Run web security regression tests
+        run: uv run pytest -q tests/test_web_security.py tests/test_web_input_safety.py tests/test_input_template.py
+
+      - name: Run full regression suite
+        run: uv run pytest -q
+
+      - name: Check tracked transient artifacts
+        run: |
+          if git ls-files | grep -E '(^|/)(__pycache__|\.pytest_cache)(/|$)|\.pyc$|\.log$'; then
+            echo "Tracked transient artifact detected" >&2
+            exit 1
+          fi
+
+      - name: Repository must remain clean
+        run: git status --porcelain | tee /tmp/status && test ! -s /tmp/status
