@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import hashlib
 import math
+from collections.abc import Iterable
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Iterable
 
 import pandas as pd
 
