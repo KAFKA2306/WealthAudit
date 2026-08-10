@@ -49,7 +49,7 @@ jobs:
           enable-cache: true
 
       - name: Install dependencies
-        run: uv sync --frozen --extra dev
+        run: uv sync --frozen --extra dev --extra mcp
 
       - name: Compile monthly close entry points
         run: >-
