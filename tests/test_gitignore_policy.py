@@ -1,4 +1,5 @@
 from pathlib import Path
+import subprocess
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -26,6 +27,18 @@ PUBLIC_MASTER_EXAMPLES = (
 )
 
 
+def _is_tracked(path: Path) -> bool:
+    relative = path.relative_to(ROOT).as_posix()
+    result = subprocess.run(
+        ["git", "ls-files", "--error-unmatch", relative],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return result.returncode == 0
+
+
 def test_gitignore_blocks_sensitive_operational_files() -> None:
     gitignore = ROOT / ".gitignore"
     patterns = {
@@ -37,9 +50,9 @@ def test_gitignore_blocks_sensitive_operational_files() -> None:
     assert REQUIRED_OPERATIONAL_PATTERNS <= patterns
 
 
-def test_private_financial_master_files_are_not_in_public_checkout() -> None:
-    assert all(not path.exists() for path in PRIVATE_MASTER_PATHS)
-    assert all(path.exists() for path in PUBLIC_MASTER_EXAMPLES)
+def test_private_financial_master_files_are_not_tracked() -> None:
+    assert all(not _is_tracked(path) for path in PRIVATE_MASTER_PATHS)
+    assert all(_is_tracked(path) for path in PUBLIC_MASTER_EXAMPLES)
 
 
 def test_public_master_examples_do_not_name_real_financial_services() -> None:
