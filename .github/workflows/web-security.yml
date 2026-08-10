@@ -50,7 +50,7 @@ jobs:
           enable-cache: true
 
       - name: Install dependencies
-        run: uv sync --frozen --extra dev
+        run: uv sync --frozen --extra dev --extra mcp
 
       - name: Compile web boundary
         run: uv run python -m py_compile src/infrastructure/web.py src/infrastructure/web_security.py tests/test_web_security.py tests/test_gitignore_policy.py
