@@ -9,6 +9,9 @@ on:
       - "tests/conftest.py"
       - "tests/test_web_security.py"
       - "tests/test_web_input_safety.py"
+      - "tests/test_gitignore_policy.py"
+      - "master/**"
+      - ".gitignore"
       - ".github/workflows/web-security.yml"
   push:
     branches: [main]
@@ -19,6 +22,9 @@ on:
       - "tests/conftest.py"
       - "tests/test_web_security.py"
       - "tests/test_web_input_safety.py"
+      - "tests/test_gitignore_policy.py"
+      - "master/**"
+      - ".gitignore"
       - ".github/workflows/web-security.yml"
 
 permissions:
@@ -45,15 +51,24 @@ jobs:
         run: uv sync --frozen --extra dev
 
       - name: Compile web boundary
-        run: uv run python -m py_compile src/infrastructure/web.py src/infrastructure/web_security.py tests/test_web_security.py
+        run: uv run python -m py_compile src/infrastructure/web.py src/infrastructure/web_security.py tests/test_web_security.py tests/test_gitignore_policy.py
 
       - name: Reject unsafe Flask development defaults
         run: |
           ! grep -R "run(debug=True" -n src
           grep -F 'host="127.0.0.1"' src/infrastructure/web.py
 
+      - name: Enforce private financial master boundary
+        run: |
+          test ! -e master/accounts.csv
+          test ! -e master/payment_methods.csv
+          test -e master/accounts.example.csv
+          test -e master/payment_methods.example.csv
+          grep -Fx '/master/accounts.csv' .gitignore
+          grep -Fx '/master/payment_methods.csv' .gitignore
+
       - name: Run web security regression tests
-        run: uv run pytest -q tests/test_web_security.py tests/test_web_input_safety.py tests/test_input_template.py
+        run: uv run pytest -q tests/test_web_security.py tests/test_web_input_safety.py tests/test_input_template.py tests/test_gitignore_policy.py
 
       - name: Run full regression suite
         run: uv run pytest -q
