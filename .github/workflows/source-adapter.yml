@@ -26,7 +26,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
-      - run: uv sync --extra dev
+      - run: uv sync --frozen --extra dev --extra mcp
       - name: Compile adapter
         run: uv run python -m py_compile src/use_cases/source_adapter.py tests/test_source_adapter.py
       - name: Adapter tests
