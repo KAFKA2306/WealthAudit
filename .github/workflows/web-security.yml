@@ -11,6 +11,7 @@ on:
       - "tests/test_web_input_safety.py"
       - "tests/test_gitignore_policy.py"
       - "master/**"
+      - "docs/private-master-migration.md"
       - ".gitignore"
       - ".github/workflows/web-security.yml"
   push:
@@ -24,6 +25,7 @@ on:
       - "tests/test_web_input_safety.py"
       - "tests/test_gitignore_policy.py"
       - "master/**"
+      - "docs/private-master-migration.md"
       - ".gitignore"
       - ".github/workflows/web-security.yml"
 
