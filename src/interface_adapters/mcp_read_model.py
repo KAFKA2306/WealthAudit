@@ -4,7 +4,7 @@ import hashlib
 import math
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Iterable
 
 import pandas as pd
 
