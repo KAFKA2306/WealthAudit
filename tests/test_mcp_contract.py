@@ -5,8 +5,8 @@ from pathlib import Path
 
 import pandas as pd
 
-from src.interface_adapters.mcp_read_model import FinancialReadModel
 from src.interface_adapters import mcp_server
+from src.interface_adapters.mcp_read_model import FinancialReadModel
 from src.use_cases.graph_service import last_completed_month
 
 
