@@ -8,7 +8,11 @@ from pathlib import Path
 
 import pandas as pd
 
-from src.use_cases.graph_service import GraphService, last_completed_month, total_wealth_flow
+from src.use_cases.graph_service import (
+    GraphService,
+    last_completed_month,
+    total_wealth_flow,
+)
 
 FORECAST_FILE = Path("data/calculated/forecast.csv")
 PARAMETERS_FILE = Path("data/calculated/forecast_parameters.csv")
