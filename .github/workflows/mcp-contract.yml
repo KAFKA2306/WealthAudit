@@ -33,10 +33,10 @@ jobs:
           python-version: "3.12"
       - name: Install local MCP and test dependencies
         run: python -m pip install -e '.[dev,mcp]'
-      - name: Syntax and lint
-        run: |
-          python -m py_compile src/interface_adapters/mcp_read_model.py src/interface_adapters/mcp_server.py tests/test_mcp_contract.py
-          ruff check src/interface_adapters/mcp_read_model.py src/interface_adapters/mcp_server.py tests/test_mcp_contract.py
+      - name: Verify Python syntax
+        run: python -m py_compile src/interface_adapters/mcp_read_model.py src/interface_adapters/mcp_server.py tests/test_mcp_contract.py
+      - name: Verify Ruff contract
+        run: ruff check --output-format=github src/interface_adapters/mcp_read_model.py src/interface_adapters/mcp_server.py tests/test_mcp_contract.py
       - name: Verify localhost MCP privacy and data semantics
         run: pytest -q tests/test_mcp_contract.py
       - name: Verify private operational files remain ignored
