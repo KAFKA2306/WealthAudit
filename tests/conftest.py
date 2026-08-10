@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import os
 from pathlib import Path
+import shutil
 import sys
 from typing import Any
 
@@ -14,6 +15,33 @@ from werkzeug.datastructures import Headers, MultiDict
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
+
+
+@pytest.fixture(scope="session", autouse=True)
+def bootstrap_ci_private_masters() -> None:
+    """Seed ignored synthetic masters in CI without publishing user metadata."""
+
+    if os.environ.get("CI", "").lower() != "true":
+        yield
+        return
+
+    created: list[Path] = []
+    for source_name, private_name in (
+        ("accounts.example.csv", "accounts.csv"),
+        ("payment_methods.example.csv", "payment_methods.csv"),
+    ):
+        source = ROOT / "master" / source_name
+        destination = ROOT / "master" / private_name
+        if destination.exists():
+            raise RuntimeError(f"CI checkout unexpectedly contains private master: {destination}")
+        shutil.copyfile(source, destination)
+        created.append(destination)
+
+    try:
+        yield
+    finally:
+        for path in created:
+            path.unlink(missing_ok=True)
 
 
 @pytest.fixture(autouse=True)
