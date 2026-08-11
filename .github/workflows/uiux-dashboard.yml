@@ -33,7 +33,7 @@ jobs:
         run: uv sync --frozen --extra dev
 
       - name: Compile changed Python
-        run: uv run python -m py_compile src/use_cases/graph_service.py tests/test_dashboard_ui.py
+        run: uv run --frozen python -m py_compile src/use_cases/graph_service.py tests/test_dashboard_ui.py
 
       - name: Run regression tests
-        run: uv run pytest -q
+        run: uv run --frozen --with "mcp>=2,<3" pytest -q
