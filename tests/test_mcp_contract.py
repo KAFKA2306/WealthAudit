@@ -155,6 +155,40 @@ def test_latest_snapshot_is_actual_and_forecast_stays_explicit(tmp_path: Path) -
     assert forecast["items"][0]["actual_or_forecast"] == "forecast"
 
 
+def test_financial_rows_expose_complete_provenance_envelope(tmp_path: Path) -> None:
+    write_dataset(tmp_path)
+    model = FinancialReadModel(tmp_path)
+    actual = model.financial_snapshot()
+    forecast = model.forecast(months=1)["items"][0]
+    required = {
+        "canonical_id",
+        "schema_version",
+        "period",
+        "actual_or_forecast",
+        "data_as_of",
+        "generated_at",
+        "input_source",
+        "input_hash",
+        "freshness",
+        "stale",
+        "null_reason",
+        "derivation_method",
+        "assumptions",
+        "provenance",
+    }
+    assert required <= actual.keys()
+    assert required <= forecast.keys()
+    assert actual["canonical_id"] == f"wealthaudit:actual:{actual['period']}"
+    assert forecast["canonical_id"] == f"wealthaudit:forecast:{forecast['period']}"
+    assert actual["data_as_of"] == actual["period"]
+    assert forecast["data_as_of"] == forecast["period"]
+    assert actual["input_source"] == "data/calculated/forecast.csv"
+    assert len(actual["input_hash"]) == 64
+    assert actual["provenance"]["input_hash"] == actual["input_hash"]
+    assert actual["assumptions"] == []
+    assert forecast["assumptions"]
+
+
 def test_dashboard_and_mcp_allocation_use_same_calculation(tmp_path: Path) -> None:
     write_dataset(tmp_path)
     model = FinancialReadModel(tmp_path)
