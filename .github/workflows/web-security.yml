@@ -15,6 +15,7 @@ on:
       - "tests/test_monthly_close_process_lock.py"
       - "tests/test_monthly_close_subprocess_boundary.py"
       - "tests/test_gitignore_policy.py"
+      - "tests/test_public_history_financial_metadata.py"
       - "master/**"
       - "docs/private-master-migration.md"
       - ".gitignore"
@@ -34,6 +35,7 @@ on:
       - "tests/test_monthly_close_process_lock.py"
       - "tests/test_monthly_close_subprocess_boundary.py"
       - "tests/test_gitignore_policy.py"
+      - "tests/test_public_history_financial_metadata.py"
       - "master/**"
       - "docs/private-master-migration.md"
       - ".gitignore"
@@ -48,6 +50,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -63,7 +67,7 @@ jobs:
         run: uv sync --frozen --extra dev
 
       - name: Compile web boundary
-        run: uv run --frozen python -m py_compile src/infrastructure/web.py src/infrastructure/web_security.py src/infrastructure/monthly_close.py src/infrastructure/monthly_input_validation.py tests/test_web_security.py tests/test_monthly_input_validation.py tests/test_monthly_close_process_lock.py tests/test_monthly_close_subprocess_boundary.py tests/test_gitignore_policy.py
+        run: uv run --frozen python -m py_compile src/infrastructure/web.py src/infrastructure/web_security.py src/infrastructure/monthly_close.py src/infrastructure/monthly_input_validation.py tests/test_web_security.py tests/test_monthly_input_validation.py tests/test_monthly_close_process_lock.py tests/test_monthly_close_subprocess_boundary.py tests/test_gitignore_policy.py tests/test_public_history_financial_metadata.py
 
       - name: Reject unsafe Flask development defaults
         run: |
@@ -80,7 +84,7 @@ jobs:
           grep -Fx '/master/payment_methods.csv' .gitignore
 
       - name: Run web security regression tests
-        run: uv run --frozen pytest -q tests/test_web_security.py tests/test_web_input_safety.py tests/test_monthly_input_validation.py tests/test_monthly_close_process_lock.py tests/test_monthly_close_subprocess_boundary.py tests/test_input_template.py tests/test_gitignore_policy.py
+        run: uv run --frozen pytest -q tests/test_web_security.py tests/test_web_input_safety.py tests/test_monthly_input_validation.py tests/test_monthly_close_process_lock.py tests/test_monthly_close_subprocess_boundary.py tests/test_input_template.py tests/test_gitignore_policy.py tests/test_public_history_financial_metadata.py
 
       - name: Run full regression suite
         run: uv run --frozen --with "mcp>=2,<3" pytest -q
