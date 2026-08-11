@@ -49,9 +49,10 @@ jobs:
         with:
           enable-cache: true
 
-      # This gate exercises only the Flask/web boundary. Keep it independent of
-      # the optional MCP adapter so an unrelated MCP lockfile change cannot
-      # suppress the security regression suite before tests even start.
+      # Keep the targeted web-security regression independent from the optional
+      # MCP adapter so its failures cannot suppress the security checks. The
+      # repository-wide regression below adds MCP ephemerally with uv --with;
+      # that exercises the full suite without mutating the stale project lock.
       - name: Install web security dependencies
         run: uv sync --frozen --extra dev
 
@@ -76,7 +77,7 @@ jobs:
         run: uv run pytest -q tests/test_web_security.py tests/test_web_input_safety.py tests/test_input_template.py tests/test_gitignore_policy.py
 
       - name: Run full regression suite
-        run: uv run pytest -q
+        run: uv run --with "mcp>=2,<3" pytest -q
 
       - name: Check tracked transient artifacts
         run: |
