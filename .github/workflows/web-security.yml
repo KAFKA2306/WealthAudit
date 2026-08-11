@@ -87,4 +87,12 @@ jobs:
           fi
 
       - name: Repository must remain clean
-        run: git status --porcelain | tee /tmp/status && test ! -s /tmp/status
+        shell: bash
+        run: |
+          git status --porcelain | tee /tmp/status
+          if test -s /tmp/status; then
+            while IFS= read -r dirty; do
+              echo "::error title=Repository dirtied by regression suite::$dirty"
+            done < /tmp/status
+            exit 1
+          fi
