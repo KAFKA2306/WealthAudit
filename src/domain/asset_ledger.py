@@ -117,7 +117,7 @@ class AssetLedger(BaseModel):
     balance_snapshots: list[BalanceSnapshot] = Field(default_factory=list)
 
     @model_validator(mode="after")
-    def validate_references_and_duplicates(self) -> "AssetLedger":
+    def validate_references_and_duplicates(self) -> AssetLedger:
         institution_ids = [item.institution_id for item in self.institutions]
         account_ids = [item.account_id for item in self.accounts]
         asset_ids = [item.asset_id for item in self.assets]
@@ -181,7 +181,7 @@ def reconcile_asset_ledger(
     invalid_accounts: set[str] = set()
     problems: list[str] = []
 
-    for account_id, account in accounts.items():
+    for account_id in accounts:
         snapshot = balances.get((account_id, as_of))
         if snapshot is None:
             problems.append(f"missing balance_snapshot: {account_id} @ {as_of.isoformat()}")
