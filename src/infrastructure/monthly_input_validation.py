@@ -8,9 +8,12 @@ from typing import Iterable
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
+from src.constants import AssetClassId
+
 MAX_ROWS_PER_SECTION = 500
 MAX_AMOUNT = 1_000_000_000_000
 MAX_BALANCE = 1_000_000_000_000_000.0
+CANONICAL_ASSET_CLASSES = {item.value for item in AssetClassId}
 
 
 class IncomeRow(BaseModel):
@@ -88,8 +91,9 @@ def validate_monthly_input(
     if unknown_methods:
         raise ValueError(f"unknown method_id: {', '.join(unknown_methods)}")
 
+    canonical_asset_classes = CANONICAL_ASSET_CLASSES | allowed_asset_classes
     unknown_asset_classes = _unknown(
-        [row.asset_class for row in model.assets], allowed_asset_classes
+        [row.asset_class for row in model.assets], canonical_asset_classes
     )
     if unknown_asset_classes:
         raise ValueError(
@@ -112,6 +116,7 @@ def validate_monthly_input(
 
 __all__ = [
     "AssetRow",
+    "CANONICAL_ASSET_CLASSES",
     "ExpenseRow",
     "IncomeRow",
     "MonthlyInput",
