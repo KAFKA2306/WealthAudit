@@ -5,10 +5,12 @@ on:
     paths:
       - "src/infrastructure/web.py"
       - "src/infrastructure/web_security.py"
+      - "src/infrastructure/monthly_close.py"
       - "templates/input.html"
       - "tests/conftest.py"
       - "tests/test_web_security.py"
       - "tests/test_web_input_safety.py"
+      - "tests/test_monthly_close_process_lock.py"
       - "tests/test_gitignore_policy.py"
       - "master/**"
       - "docs/private-master-migration.md"
@@ -19,10 +21,12 @@ on:
     paths:
       - "src/infrastructure/web.py"
       - "src/infrastructure/web_security.py"
+      - "src/infrastructure/monthly_close.py"
       - "templates/input.html"
       - "tests/conftest.py"
       - "tests/test_web_security.py"
       - "tests/test_web_input_safety.py"
+      - "tests/test_monthly_close_process_lock.py"
       - "tests/test_gitignore_policy.py"
       - "master/**"
       - "docs/private-master-migration.md"
@@ -56,7 +60,7 @@ jobs:
         run: uv sync --frozen --extra dev
 
       - name: Compile web boundary
-        run: uv run --frozen python -m py_compile src/infrastructure/web.py src/infrastructure/web_security.py tests/test_web_security.py tests/test_gitignore_policy.py
+        run: uv run --frozen python -m py_compile src/infrastructure/web.py src/infrastructure/web_security.py src/infrastructure/monthly_close.py tests/test_web_security.py tests/test_monthly_close_process_lock.py tests/test_gitignore_policy.py
 
       - name: Reject unsafe Flask development defaults
         run: |
@@ -73,7 +77,7 @@ jobs:
           grep -Fx '/master/payment_methods.csv' .gitignore
 
       - name: Run web security regression tests
-        run: uv run --frozen pytest -q tests/test_web_security.py tests/test_web_input_safety.py tests/test_input_template.py tests/test_gitignore_policy.py
+        run: uv run --frozen pytest -q tests/test_web_security.py tests/test_web_input_safety.py tests/test_monthly_close_process_lock.py tests/test_input_template.py tests/test_gitignore_policy.py
 
       - name: Run full regression suite
         run: uv run --frozen --with "mcp>=2,<3" pytest -q
