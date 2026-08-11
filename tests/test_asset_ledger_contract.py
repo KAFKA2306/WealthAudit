@@ -64,42 +64,54 @@ def make_ledger() -> AssetLedger:
             Asset(asset_id="PENSION_FUND", kind=AssetKind.PENSION, currency="JPY"),
         ],
         holdings=[
-            Holding(account_id="acct_broker", asset_id="JP0000000001", quantity=Decimal("10")),
-            Holding(account_id="acct_crypto", asset_id="BTC", quantity=Decimal("0.1")),
-            Holding(account_id="acct_pension", asset_id="PENSION_FUND", quantity=Decimal("1")),
+            Holding(
+                account_id="acct_broker",
+                asset_id="JP0000000001",
+                quantity=Decimal(10),
+            ),
+            Holding(
+                account_id="acct_crypto",
+                asset_id="BTC",
+                quantity=Decimal("0.1"),
+            ),
+            Holding(
+                account_id="acct_pension",
+                asset_id="PENSION_FUND",
+                quantity=Decimal(1),
+            ),
         ],
         balance_snapshots=[
             BalanceSnapshot(
                 account_id="acct_bank",
-                balance=Decimal("1000000"),
+                balance=Decimal(1000000),
                 currency="JPY",
                 balance_date=date(2026, 7, 31),
                 source_revision="sha256:bank",
             ),
             BalanceSnapshot(
                 account_id="acct_broker",
-                balance=Decimal("200000"),
+                balance=Decimal(200000),
                 currency="JPY",
                 balance_date=date(2026, 7, 31),
                 source_revision="sha256:broker-cash",
             ),
             BalanceSnapshot(
                 account_id="acct_fintech",
-                balance=Decimal("50000"),
+                balance=Decimal(50000),
                 currency="JPY",
                 balance_date=date(2026, 7, 31),
                 source_revision="sha256:fintech",
             ),
             BalanceSnapshot(
                 account_id="acct_crypto",
-                balance=Decimal("10000"),
+                balance=Decimal(10000),
                 currency="JPY",
                 balance_date=date(2026, 7, 31),
                 source_revision="sha256:crypto-cash",
             ),
             BalanceSnapshot(
                 account_id="acct_pension",
-                balance=Decimal("0"),
+                balance=Decimal(0),
                 currency="JPY",
                 balance_date=date(2026, 7, 31),
                 source_revision="sha256:pension-cash",
@@ -109,7 +121,7 @@ def make_ledger() -> AssetLedger:
             Valuation(
                 account_id="acct_broker",
                 asset_id="JP0000000001",
-                value=Decimal("3000000"),
+                value=Decimal(3000000),
                 currency="JPY",
                 valuation_date=date(2026, 7, 31),
                 source_revision="sha256:equity",
@@ -117,7 +129,7 @@ def make_ledger() -> AssetLedger:
             Valuation(
                 account_id="acct_crypto",
                 asset_id="BTC",
-                value=Decimal("900000"),
+                value=Decimal(900000),
                 currency="JPY",
                 valuation_date=date(2026, 7, 31),
                 source_revision="sha256:btc",
@@ -125,7 +137,7 @@ def make_ledger() -> AssetLedger:
             Valuation(
                 account_id="acct_pension",
                 asset_id="PENSION_FUND",
-                value=Decimal("2500000"),
+                value=Decimal(2500000),
                 currency="JPY",
                 valuation_date=date(2026, 7, 31),
                 source_revision="sha256:pension",
@@ -137,12 +149,12 @@ def make_ledger() -> AssetLedger:
 def test_reconciliation_keeps_bank_and_broker_cash_separate() -> None:
     result = reconcile_asset_ledger(make_ledger(), as_of=date(2026, 7, 31))
 
-    assert result.subtotals[AccountType.BANK] == Decimal("1000000")
-    assert result.subtotals[AccountType.SECURITIES] == Decimal("3200000")
-    assert result.subtotals[AccountType.FINTECH] == Decimal("50000")
-    assert result.subtotals[AccountType.CRYPTO] == Decimal("910000")
-    assert result.subtotals[AccountType.PENSION] == Decimal("2500000")
-    assert result.total_assets == Decimal("7660000")
+    assert result.subtotals[AccountType.BANK] == Decimal(1000000)
+    assert result.subtotals[AccountType.SECURITIES] == Decimal(3200000)
+    assert result.subtotals[AccountType.FINTECH] == Decimal(50000)
+    assert result.subtotals[AccountType.CRYPTO] == Decimal(910000)
+    assert result.subtotals[AccountType.PENSION] == Decimal(2500000)
+    assert result.total_assets == Decimal(7660000)
     assert result.problems == []
 
 
