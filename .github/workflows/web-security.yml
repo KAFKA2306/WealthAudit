@@ -51,8 +51,8 @@ jobs:
 
       # Keep the targeted web-security regression independent from the optional
       # MCP adapter so its failures cannot suppress the security checks. The
-      # repository-wide regression below adds MCP ephemerally with uv --with;
-      # that exercises the full suite without mutating the stale project lock.
+      # repository-wide regression adds MCP as an ephemeral overlay while
+      # --frozen prevents the stale project lock from being rewritten.
       - name: Install web security dependencies
         run: uv sync --frozen --extra dev
 
@@ -77,7 +77,7 @@ jobs:
         run: uv run pytest -q tests/test_web_security.py tests/test_web_input_safety.py tests/test_input_template.py tests/test_gitignore_policy.py
 
       - name: Run full regression suite
-        run: uv run --with "mcp>=2,<3" pytest -q
+        run: uv run --frozen --with "mcp>=2,<3" pytest -q
 
       - name: Check tracked transient artifacts
         run: |
