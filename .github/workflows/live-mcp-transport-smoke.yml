@@ -1,0 +1,64 @@
+name: One-shot WealthAudit MCP transport smoke
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/live-mcp-transport-smoke.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install -e '.[mcp]'
+      - name: Start server
+        run: |
+          python -m src.interface_adapters.mcp_server >/tmp/wealthaudit-mcp.log 2>&1 &
+          echo $! >/tmp/wealthaudit-mcp.pid
+          sleep 2
+      - name: Initialize and list live tools
+        run: |
+          python - <<'PY'
+          import asyncio
+          from mcp import ClientSession
+          from mcp.client.streamable_http import streamable_http_client
+
+          EXPECTED = {
+              "get_financial_snapshot", "get_balance_sheet", "get_cash_flow",
+              "get_asset_allocation", "get_investment_returns", "get_fi_metrics",
+              "get_forecast", "get_warnings", "get_data_freshness", "get_audit_diff",
+              "get_external_data_sources", "get_boj_time_series", "get_ecb_series",
+              "get_estat_stats_data", "get_jquants_daily_bars",
+          }
+
+          async def main():
+              async with streamable_http_client("http://127.0.0.1:8012/mcp") as streams:
+                  read_stream, write_stream, *_ = streams
+                  async with ClientSession(read_stream, write_stream) as session:
+                      init = await session.initialize()
+                      tools = await session.list_tools()
+                      names = {tool.name for tool in tools.tools}
+                      assert names == EXPECTED, sorted(names)
+                      print("MCP_TRANSPORT_OK", {
+                          "server_name": init.server_info.name,
+                          "server_version": init.server_info.version,
+                          "tool_count": len(names),
+                          "tools": sorted(names),
+                      })
+
+          asyncio.run(main())
+          PY
+      - name: Show server log
+        if: always()
+        run: cat /tmp/wealthaudit-mcp.log || true
+      - name: Stop server
+        if: always()
+        run: kill "$(cat /tmp/wealthaudit-mcp.pid)" 2>/dev/null || true
