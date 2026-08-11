@@ -59,7 +59,12 @@ jobs:
           src/interface_adapters/source_registry.py
           tests/test_mcp_contract.py
           tests/test_official_apis.py
-      - name: Verify localhost MCP privacy and data semantics
+      - name: Verify localhost MCP privacy, provenance, and data semantics
         run: pytest -q tests/test_mcp_contract.py tests/test_official_apis.py
       - name: Verify private operational files remain ignored
         run: pytest -q tests/test_gitignore_policy.py
+      - name: Verify clean checkout
+        run: |
+          find . -type d -name '__pycache__' -prune -exec rm -rf {} +
+          rm -rf .pytest_cache .ruff_cache .mypy_cache *.egg-info
+          test -z "$(git status --porcelain --untracked-files=all)"
