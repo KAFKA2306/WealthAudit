@@ -6,11 +6,21 @@ import secrets
 from urllib.parse import urlsplit
 
 from flask import Flask, Response, request
+from plotly.offline.offline import get_plotlyjs
 
 DEFAULT_MAX_CONTENT_LENGTH = 64 * 1024
 MAX_GRAPH_MONTHS = 120
 MAX_FORECAST_MONTHS = 120
 SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
+HTMX_URL = "https://cdn.jsdelivr.net/npm/htmx.org@2.0.10/dist/htmx.min.js"
+HTMX_INTEGRITY = "sha384-H5SrcfygHmAuTDZphMHqBJLc3FhssKjG7w/CeCpFReSfwBWDTKpkzPP8c+cLsK+V"
+PLOTLY_CDN_TAG = '<script src="https://cdn.plot.ly/plotly-3.3.0.min.js" defer></script>'
+PLOTLY_LOCAL_TAG = '<script src="/static/vendor/plotly.min.js" defer></script>'
+HTMX_LEGACY_TAG = '<script src="https://unpkg.com/htmx.org@2.0.1" defer></script>'
+HTMX_PINNED_TAG = (
+    f'<script src="{HTMX_URL}" integrity="{HTMX_INTEGRITY}" '
+    'crossorigin="anonymous" defer></script>'
+)
 
 
 def _same_origin() -> bool:
@@ -51,9 +61,21 @@ def apply_web_security(app: Flask) -> None:
     csrf_token = os.environ.get("WEALTHAUDIT_CSRF_TOKEN") or secrets.token_urlsafe(32)
     app.jinja_env.globals["wealthaudit_csrf_token"] = lambda: csrf_token
 
+    def serve_plotly_vendor() -> Response:
+        response = Response(get_plotlyjs(), mimetype="application/javascript")
+        response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        return response
+
+    app.add_url_rule(
+        "/static/vendor/plotly.min.js",
+        endpoint="wealthaudit_plotly_vendor",
+        view_func=serve_plotly_vendor,
+        methods=["GET"],
+    )
+
     @app.before_request
     def enforce_web_boundary() -> Response | None:
-        if request.endpoint == "static":
+        if request.endpoint in {"static", "wealthaudit_plotly_vendor"}:
             return None
 
         if not access_token:
@@ -88,9 +110,15 @@ def apply_web_security(app: Flask) -> None:
 
     @app.after_request
     def add_security_headers(response: Response) -> Response:
+        if response.mimetype == "text/html":
+            body = response.get_data(as_text=True)
+            body = body.replace(PLOTLY_CDN_TAG, PLOTLY_LOCAL_TAG)
+            body = body.replace(HTMX_LEGACY_TAG, HTMX_PINNED_TAG)
+            response.set_data(body)
+
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; "
-            "script-src 'self' 'unsafe-inline' https://cdn.plot.ly https://unpkg.com; "
+            "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
             "style-src 'self' 'unsafe-inline'; "
             "img-src 'self' data:; connect-src 'self'; "
             "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; "
