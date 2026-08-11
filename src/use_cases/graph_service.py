@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import html
 import os
+from collections import OrderedDict
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Callable, Optional, cast
@@ -73,10 +74,15 @@ def total_wealth_flow(df: pd.DataFrame) -> pd.Series:
 @dataclass
 class GraphService:
     data_dir: str
+    chart_cache_max_entries: int = 64
     _csv_cache: dict[str, tuple[float, pd.DataFrame]] = field(default_factory=dict)
-    _chart_cache: dict[tuple[str, Optional[int], Optional[int], float], str] = field(
-        default_factory=dict
-    )
+    _chart_cache: OrderedDict[
+        tuple[str, Optional[int], Optional[int], float], str
+    ] = field(default_factory=OrderedDict)
+
+    def __post_init__(self) -> None:
+        if self.chart_cache_max_entries < 1:
+            raise ValueError("chart_cache_max_entries must be at least 1")
 
     def warm_visible_cache(self) -> None:
         ranges = (
@@ -321,10 +327,18 @@ class GraphService:
         builder: Callable[[pd.DataFrame], go.Figure],
     ) -> str:
         key = self._cache_key(name, months, forecast)
-        if key not in self._chart_cache:
-            frame = self._data(months, forecast)
-            self._chart_cache[key] = self._to_html(builder(frame), name, frame, forecast)
-        return self._chart_cache[key]
+        cached = self._chart_cache.get(key)
+        if cached is not None:
+            self._chart_cache.move_to_end(key)
+            return cached
+
+        frame = self._data(months, forecast)
+        rendered = self._to_html(builder(frame), name, frame, forecast)
+        self._chart_cache[key] = rendered
+        self._chart_cache.move_to_end(key)
+        while len(self._chart_cache) > self.chart_cache_max_entries:
+            self._chart_cache.popitem(last=False)
+        return rendered
 
     def get_net_worth_chart(
         self, months: Optional[int] = None, forecast: Optional[int] = None

@@ -53,7 +53,7 @@ jobs:
 
       - name: Compile monthly close entry points
         run: >-
-          uv run python -m py_compile
+          uv run --frozen python -m py_compile
           src/use_cases/monthly_close.py
           src/infrastructure/monthly_close.py
           src/infrastructure/monthly_close_cli.py
@@ -63,7 +63,7 @@ jobs:
           tests/test_issue_2_financial_consistency.py
 
       - name: Run full regression suite
-        run: uv run pytest -q
+        run: uv run --frozen --with "mcp>=2,<3" pytest -q
 
       - name: Verify repository is clean
         run: |

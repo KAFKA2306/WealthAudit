@@ -3,7 +3,6 @@ __pycache__/
 *.pyc
 *.log
 
-
 # Distribution / Packaging
 .Python
 build/
@@ -72,3 +71,7 @@ backup/
 *.tmp
 *conflicted copy*
 *Conflicted copy*
+
+# 個人の金融サービス構成。公開側は *.example.csv のみ追跡する。
+/master/accounts.csv
+/master/payment_methods.csv

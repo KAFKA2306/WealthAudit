@@ -1,0 +1,108 @@
+name: Validate web security boundary
+
+on:
+  pull_request:
+    paths:
+      - "src/infrastructure/web.py"
+      - "src/infrastructure/web_security.py"
+      - "src/infrastructure/monthly_close.py"
+      - "src/infrastructure/monthly_input_validation.py"
+      - "templates/input.html"
+      - "tests/conftest.py"
+      - "tests/test_web_security.py"
+      - "tests/test_web_input_safety.py"
+      - "tests/test_monthly_input_validation.py"
+      - "tests/test_monthly_close_process_lock.py"
+      - "tests/test_monthly_close_subprocess_boundary.py"
+      - "tests/test_gitignore_policy.py"
+      - "tests/test_public_history_financial_metadata.py"
+      - "master/**"
+      - "docs/private-master-migration.md"
+      - ".gitignore"
+      - ".github/workflows/web-security.yml"
+  push:
+    branches: [main]
+    paths:
+      - "src/infrastructure/web.py"
+      - "src/infrastructure/web_security.py"
+      - "src/infrastructure/monthly_close.py"
+      - "src/infrastructure/monthly_input_validation.py"
+      - "templates/input.html"
+      - "tests/conftest.py"
+      - "tests/test_web_security.py"
+      - "tests/test_web_input_safety.py"
+      - "tests/test_monthly_input_validation.py"
+      - "tests/test_monthly_close_process_lock.py"
+      - "tests/test_monthly_close_subprocess_boundary.py"
+      - "tests/test_gitignore_policy.py"
+      - "tests/test_public_history_financial_metadata.py"
+      - "master/**"
+      - "docs/private-master-migration.md"
+      - ".gitignore"
+      - ".github/workflows/web-security.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Install web security dependencies
+        run: uv sync --frozen --extra dev
+
+      - name: Compile web boundary
+        run: uv run --frozen python -m py_compile src/infrastructure/web.py src/infrastructure/web_security.py src/infrastructure/monthly_close.py src/infrastructure/monthly_input_validation.py tests/test_web_security.py tests/test_monthly_input_validation.py tests/test_monthly_close_process_lock.py tests/test_monthly_close_subprocess_boundary.py tests/test_gitignore_policy.py tests/test_public_history_financial_metadata.py
+
+      - name: Reject unsafe Flask development defaults
+        run: |
+          ! grep -R "run(debug=True" -n src
+          grep -F 'host="127.0.0.1"' src/infrastructure/web.py
+
+      - name: Enforce private financial master boundary
+        run: |
+          test ! -e master/accounts.csv
+          test ! -e master/payment_methods.csv
+          test -e master/accounts.example.csv
+          test -e master/payment_methods.example.csv
+          grep -Fx '/master/accounts.csv' .gitignore
+          grep -Fx '/master/payment_methods.csv' .gitignore
+
+      - name: Run web security regression tests
+        run: uv run --frozen pytest -q tests/test_web_security.py tests/test_web_input_safety.py tests/test_monthly_input_validation.py tests/test_monthly_close_process_lock.py tests/test_monthly_close_subprocess_boundary.py tests/test_input_template.py tests/test_gitignore_policy.py tests/test_public_history_financial_metadata.py
+
+      - name: Run full regression suite
+        run: uv run --frozen --with "mcp>=2,<3" pytest -q
+
+      - name: Check tracked transient artifacts
+        run: |
+          if git ls-files | grep -E '(^|/)(__pycache__|\.pytest_cache)(/|$)|\.pyc$|\.log$'; then
+            echo "Tracked transient artifact detected" >&2
+            exit 1
+          fi
+
+      - name: Repository must remain clean
+        shell: bash
+        run: |
+          git status --porcelain | tee /tmp/status
+          if test -s /tmp/status; then
+            while IFS= read -r dirty; do
+              echo "::error title=Repository dirtied by regression suite::$dirty"
+            done < /tmp/status
+            exit 1
+          fi

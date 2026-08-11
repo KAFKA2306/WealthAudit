@@ -11,14 +11,18 @@ from typing import Any
 import pandas as pd
 from dateutil.relativedelta import relativedelta  # type: ignore
 from flask import Flask, Response, redirect, render_template, request, url_for
+from pydantic import ValidationError
 
 from src.infrastructure.monthly_close import FilesystemMonthlyClosePort
+from src.infrastructure.monthly_input_validation import validate_monthly_input
+from src.infrastructure.web_security import apply_web_security
 from src.use_cases.graph_service import GraphService
 from src.use_cases.monthly_close import MonthlyCloseError, MonthlyCloseWorkflow
 
 
 def create_app() -> Flask:
     app = Flask(__name__, template_folder=os.path.join(os.getcwd(), "templates"))
+    apply_web_security(app)
     root_dir = Path(os.getcwd())
     input_dir = root_dir / "data" / "input"
     graph_service = GraphService(data_dir=str(root_dir))
@@ -58,6 +62,10 @@ def create_app() -> Flask:
         path = root_dir / "master" / "accounts.csv"
         return pd.read_csv(path) if path.exists() else pd.DataFrame()
 
+    def methods_frame() -> pd.DataFrame:
+        path = root_dir / "master" / "payment_methods.csv"
+        return pd.read_csv(path) if path.exists() else pd.DataFrame()
+
     @app.route("/")
     def dashboard() -> str:
         return render_template("dashboard.html")
@@ -65,39 +73,129 @@ def create_app() -> Flask:
     @app.route("/input", methods=["GET", "POST"])
     def input_view() -> str | Any:
         accounts = accounts_frame()
+        methods = methods_frame()
         if request.method == "POST":
-            target_month = request.form.get("target_month")
-            if not target_month:
-                return "target_month is required", 400
-
-            new_income = [
-                {"month": target_month, "account_id": account, "amount": int(amount)}
-                for account, amount in zip(
-                    request.form.getlist("income_account[]"),
-                    request.form.getlist("income_amount[]"),
-                )
-                if account and amount
-            ]
-            new_expenses = [
-                {"month": target_month, "method_id": method, "amount": int(amount)}
-                for method, amount in zip(
-                    request.form.getlist("expense_method[]"),
-                    request.form.getlist("expense_amount[]"),
-                )
-                if method and amount
-            ]
-
+            target_month = request.form.get("target_month", "")
+            income_accounts = request.form.getlist("income_account[]")
+            income_amounts = request.form.getlist("income_amount[]")
+            expense_methods = request.form.getlist("expense_method[]")
+            expense_amounts = request.form.getlist("expense_amount[]")
             asset_accounts = request.form.getlist("asset_account[]")
             asset_classes = request.form.getlist("asset_class[]")
             asset_balances = request.form.getlist("asset_balance[]")
             asset_currencies = request.form.getlist("asset_currency[]")
+
+            if len(income_accounts) != len(income_amounts):
+                return "invalid monthly input", 400
+            if len(expense_methods) != len(expense_amounts):
+                return "invalid monthly input", 400
+            if not (len(asset_accounts) == len(asset_classes) == len(asset_balances)):
+                return "invalid monthly input", 400
+            if len(asset_currencies) > len(asset_accounts):
+                return "invalid monthly input", 400
             asset_currencies += [""] * (len(asset_accounts) - len(asset_currencies))
-            account_currency = (
-                dict(zip(accounts["account_id"], accounts["currency"]))
-                if not accounts.empty and "currency" in accounts
-                else {}
-            )
-            existing_assets = load_csv("assets.csv")
+
+            def complete_pairs(
+                left: list[str], right: list[str], left_name: str, right_name: str
+            ) -> list[dict[str, str]]:
+                rows: list[dict[str, str]] = []
+                for first, second in zip(left, right):
+                    if not second:
+                        continue
+                    if not first:
+                        raise ValueError("incomplete monthly input row")
+                    rows.append({left_name: first, right_name: second})
+                return rows
+
+            try:
+                income_payload = complete_pairs(
+                    income_accounts, income_amounts, "account_id", "amount"
+                )
+                expense_payload = complete_pairs(
+                    expense_methods, expense_amounts, "method_id", "amount"
+                )
+                asset_payload: list[dict[str, str]] = []
+                for account, asset_class, balance, currency in zip(
+                    asset_accounts, asset_classes, asset_balances, asset_currencies
+                ):
+                    if not balance:
+                        continue
+                    if not account or not asset_class:
+                        raise ValueError("incomplete monthly asset row")
+                    asset_payload.append(
+                        {
+                            "account_id": account,
+                            "asset_class": asset_class,
+                            "balance": balance,
+                            "native_currency": currency.strip().upper(),
+                        }
+                    )
+
+                existing_income = load_csv("income.csv")
+                existing_expense = load_csv("expense.csv")
+                existing_assets = load_csv("assets.csv")
+                allowed_accounts = (
+                    set(accounts["account_id"].astype(str))
+                    if not accounts.empty and "account_id" in accounts
+                    else set()
+                )
+                if not allowed_accounts:
+                    if "account_id" in existing_income:
+                        allowed_accounts.update(existing_income["account_id"].dropna().astype(str))
+                    if "account_id" in existing_assets:
+                        allowed_accounts.update(existing_assets["account_id"].dropna().astype(str))
+                allowed_methods = (
+                    set(methods["method_id"].astype(str))
+                    if not methods.empty and "method_id" in methods
+                    else set()
+                )
+                if not allowed_methods and "method_id" in existing_expense:
+                    allowed_methods.update(existing_expense["method_id"].dropna().astype(str))
+                account_currency = (
+                    dict(zip(accounts["account_id"].astype(str), accounts["currency"].astype(str)))
+                    if not accounts.empty
+                    and "account_id" in accounts
+                    and "currency" in accounts
+                    else {}
+                )
+                allowed_asset_classes = (
+                    set(existing_assets["asset_class"].dropna().astype(str))
+                    if not existing_assets.empty and "asset_class" in existing_assets
+                    else set()
+                )
+                validated = validate_monthly_input(
+                    {
+                        "target_month": target_month,
+                        "income": income_payload,
+                        "expenses": expense_payload,
+                        "assets": asset_payload,
+                    },
+                    allowed_account_ids=allowed_accounts,
+                    allowed_method_ids=allowed_methods,
+                    allowed_asset_classes=allowed_asset_classes,
+                    account_currencies=account_currency,
+                )
+            except (ValidationError, ValueError):
+                return "invalid monthly input", 400
+
+            target_month = validated.target_month
+            new_income = [
+                {
+                    "month": target_month,
+                    "account_id": row.account_id,
+                    "amount": row.amount,
+                }
+                for row in validated.income
+            ]
+            new_expenses = [
+                {
+                    "month": target_month,
+                    "method_id": row.method_id,
+                    "amount": row.amount,
+                }
+                for row in validated.expenses
+            ]
+
             balance_column = (
                 "native_balance"
                 if "native_balance" in existing_assets.columns
@@ -105,30 +203,21 @@ def create_app() -> Flask:
             )
             include_currency = "native_currency" in existing_assets.columns
             new_assets: list[dict[str, Any]] = []
-            for account, asset_class, balance, currency in zip(
-                asset_accounts, asset_classes, asset_balances, asset_currencies
-            ):
-                if not (account and asset_class and balance):
-                    continue
-                configured_currency = str(account_currency.get(account, ""))
-                resolved_currency = currency.strip() or (
+            for row in validated.assets:
+                configured_currency = str(account_currency.get(row.account_id, ""))
+                resolved_currency = row.native_currency or (
                     configured_currency if configured_currency != "multi" else ""
                 )
-                if configured_currency == "multi" and not resolved_currency:
-                    return (
-                        f"native_currency is required for multi-currency account {account}",
-                        400,
-                    )
-                row: dict[str, Any] = {
+                item: dict[str, Any] = {
                     "month": target_month,
-                    "account_id": account,
-                    "asset_class": asset_class,
-                    balance_column: float(balance),
+                    "account_id": row.account_id,
+                    "asset_class": row.asset_class,
+                    balance_column: row.balance,
                 }
-                if include_currency or configured_currency == "multi" or currency.strip():
-                    row["native_currency"] = resolved_currency
+                if include_currency or configured_currency == "multi" or row.native_currency:
+                    item["native_currency"] = resolved_currency
                     include_currency = True
-                new_assets.append(row)
+                new_assets.append(item)
 
             asset_columns = ["month", "account_id", "asset_class", balance_column]
             if include_currency:
@@ -167,7 +256,7 @@ def create_app() -> Flask:
             except MonthlyCloseError as exc:
                 graph_service.clear_cache()
                 app.logger.error("Monthly close failed: %s", exc)
-                return f"Recalculation failed. Monthly close was rolled back: {exc}", 500
+                return "Recalculation failed. Monthly close was rolled back.", 500
 
             graph_service.clear_cache()
             warm_graph_cache()
@@ -207,8 +296,6 @@ def create_app() -> Flask:
             else []
         )
 
-        methods_path = root_dir / "master" / "payment_methods.csv"
-        methods = pd.read_csv(methods_path) if methods_path.exists() else pd.DataFrame()
         card_items: list[dict[str, Any]] = []
         other_expense_items: list[dict[str, Any]] = []
         if not methods.empty:
@@ -331,7 +418,7 @@ def create_app() -> Flask:
 
 
 def main() -> None:
-    create_app().run(debug=True, port=5000)
+    create_app().run(host="127.0.0.1", port=5000, debug=False)
 
 
 if __name__ == "__main__":
