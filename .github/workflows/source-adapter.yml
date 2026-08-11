@@ -5,14 +5,20 @@ on:
     branches: [main]
     paths:
       - "src/use_cases/source_adapter.py"
+      - "src/interface_adapters/official_apis.py"
+      - "src/interface_adapters/source_registry.py"
       - "tests/test_source_adapter.py"
+      - "tests/test_official_apis.py"
       - "docs/source-adapters.md"
       - ".github/workflows/source-adapter.yml"
       - ".gitignore"
   pull_request:
     paths:
       - "src/use_cases/source_adapter.py"
+      - "src/interface_adapters/official_apis.py"
+      - "src/interface_adapters/source_registry.py"
       - "tests/test_source_adapter.py"
+      - "tests/test_official_apis.py"
       - "docs/source-adapters.md"
       - ".github/workflows/source-adapter.yml"
       - ".gitignore"
@@ -26,11 +32,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
-      - run: uv sync --extra dev
+      - run: uv sync --extra dev --extra mcp
       - name: Compile adapter
-        run: uv run python -m py_compile src/use_cases/source_adapter.py tests/test_source_adapter.py
+        run: >-
+          uv run python -m py_compile
+          src/use_cases/source_adapter.py
+          src/interface_adapters/official_apis.py
+          src/interface_adapters/source_registry.py
+          tests/test_source_adapter.py
+          tests/test_official_apis.py
       - name: Adapter tests
-        run: uv run pytest -q tests/test_source_adapter.py
+        run: uv run pytest -q tests/test_source_adapter.py tests/test_official_apis.py
       - name: Full regression suite
         run: uv run pytest -q
       - name: Reject tracked raw or secret-like runtime artifacts
