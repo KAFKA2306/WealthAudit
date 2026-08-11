@@ -27,6 +27,8 @@ REQUIRED_INPUT_COLUMNS: dict[str, set[str]] = {
 }
 CORE_CALCULATED_FILES = ("cashflow.csv", "balance_sheet.csv", "metrics.csv")
 CALCULATION_TASKS = ("run", "export", "forecast")
+COMMAND_TIMEOUT_SECONDS = 300
+PASSTHROUGH_ENVIRONMENT = ("PATH", "SYSTEMROOT", "WINDIR", "COMSPEC", "PATHEXT")
 
 
 class FilesystemMonthlyClosePort:
@@ -110,7 +112,25 @@ class FilesystemMonthlyClosePort:
 
     @staticmethod
     def _run_command(command: Sequence[str], cwd: Path) -> None:
-        subprocess.run(list(command), cwd=cwd, check=True)
+        environment = {
+            key: os.environ[key]
+            for key in PASSTHROUGH_ENVIRONMENT
+            if key in os.environ
+        }
+        environment.update(
+            {
+                "HOME": str(cwd),
+                "USERPROFILE": str(cwd),
+                "PYTHONNOUSERSITE": "1",
+            }
+        )
+        subprocess.run(
+            list(command),
+            cwd=cwd,
+            check=True,
+            timeout=COMMAND_TIMEOUT_SECONDS,
+            env=environment,
+        )
 
     def _snapshot_dir(self, source: Path, name: str) -> Path | None:
         if not source.exists():
