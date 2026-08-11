@@ -1,18 +1,17 @@
-# Local read-only MCP
+# WealthAudit local MCP + official external APIs
 
-WealthAuditのMCPは、個人資産データを外部公開せず、既存のローカル計算結果を読み出すためのadapterです。EDINET DBは使用しません。
+WealthAudit の MCP は `127.0.0.1` に固定した read-only gateway です。家計・資産の raw input を公開せず、既存の計算結果と、allow-list 済みの公式外部 API だけを読み出します。外部 API は **データ取得源**であり、BS/PL/CF や FI 指標の計算エンジンではありません。
 
 ## Privacy boundary
 
-- bind先はコード上 `127.0.0.1` に固定
-- `0.0.0.0` や任意host指定は初期実装では提供しない
-- `data/`, `input.xlsx`, `view.xlsx`, `backup/` は既存 `.gitignore` を維持
-- MCP responseへ絶対パスを返さない
-- raw input workbook/CSVを返さない
-- write/mutation toolなし
-- secret/tokenをtool引数やresponseへ載せない
-
-`WEALTHAUDIT_ROOT` は、ローカルで計算済み `data/calculated/` を含むrepository rootを指定するためだけに使用します。responseでは相対artifact名とSHA-256だけを返します。
+- bind 先は `127.0.0.1` 固定
+- `data/`, `input.xlsx`, `view.xlsx`, `backup/` は Git 管理外
+- raw input workbook/CSV を MCP response に返さない
+- 絶対ローカルパスを返さない
+- write / mutation tool を提供しない
+- `ESTAT_APP_ID` と `JQUANTS_API_KEY` の値を response / provenance / URL に返さない
+- 外部 API は HTTPS + provider host allow-list を強制する
+- 外部 API response は 5 MB を上限として fail-close する
 
 ## Start
 
@@ -21,9 +20,9 @@ python -m pip install -e '.[mcp]'
 python -m src.interface_adapters.mcp_server
 ```
 
-既定endpointはloopback上のStreamable HTTPです。
+Streamable HTTP endpoint は loopback の `127.0.0.1:8012` です。
 
-## Tools
+## Local financial tools
 
 - `get_financial_snapshot`
 - `get_balance_sheet`
@@ -36,47 +35,32 @@ python -m src.interface_adapters.mcp_server
 - `get_data_freshness`
 - `get_audit_diff`
 
-## Shared calculation rule
+これらは既存の `FinancialReadModel` / domain calculation を共有し、MCP 側で財務計算を再実装しません。`forecast.csv:is_forecast` を actual / forecast 境界の正本とし、欠損を 0 に変換しません。
 
-MCPは家計計算を独自実装しません。
+## External API / MCP tools
 
-- BS/returns/FI/forecast: `scripts/forecast.py` がmaterializeした `data/calculated/forecast.csv` を読む
-- cash-flow reconciliation: 既存 `src.use_cases.graph_service.total_wealth_flow` を再利用
-- asset allocation: dashboardの `GraphService` と同じallocation table calculationを再利用
-- recalculation diff: `scripts/recalculate_audit.py` が生成する `recalculation_diff.csv` を読む
+- `get_external_data_sources`: provider、transport、capability、credential の configured boolean を返す。secret 値は返さない。
+- `get_boj_time_series`: 日本銀行「時系列統計データ検索サイト」コード API (`/api/v1/getDataCode`) を読み出す。
+- `get_ecb_series`: ECB Data Portal の SDMX REST data endpoint を読み出す。
+- `get_estat_stats_data`: e-Stat API v3.0 `getStatsData` を `ESTAT_APP_ID` で読み出す。response の request URL では app ID を `REDACTED` に置換する。
+- `get_jquants_daily_bars`: J-Quants API V2 `/equities/bars/daily` を `JQUANTS_API_KEY` header で読み出す。API key は URL / response に含めない。
 
-## Actual / forecast
+J-Quants が公開している `J-Quants/j-quants-doc-mcp` は API 仕様検索・endpoint 詳細・サンプルコード・FAQ 用の公式 documentation MCP として registry に載せます。これは市場データ取得 API の代替ではありません。
 
-`forecast.csv:is_forecast` を正本とし、各rowに `actual_or_forecast=actual|forecast` を付与します。期間未指定の主要toolは最新actualを返し、将来rowへ自動的にフォールバックしません。
+## Source of truth / official references
 
-`null`、NaN、未materialize列は0へ変換しません。`values[field]=null` と `null_reasons[field]` を返します。
+- BOJ API launch: https://www.boj.or.jp/en/statistics/outline/notice_2026/not260218a.htm
+- BOJ API guide: https://www.stat-search.boj.or.jp/ssi/docs/info/nme_aphelp_en.html
+- ECB Data Portal API: https://data.ecb.europa.eu/help/api/overview
+- e-Stat API v3.0: https://www.e-stat.go.jp/api/api-info/api-spec
+- J-Quants API V2 / official MCP announcement: https://www.jpx.co.jp/english/corporate/news/news-releases/6020/20260119.html
+- J-Quants official Python V2 client: https://github.com/J-Quants/jquants-api-client-python
+- J-Quants official documentation MCP: https://github.com/J-Quants/j-quants-doc-mcp
 
 ## Provenance
 
-数値responseは該当範囲で以下を返します。
-
-- period
-- actual_or_forecast
-- derivation_method
-- relative `input_source`
-- SHA-256 `input_hash`
-- generated_at（artifact mtimeをUTC化）
-- null_reasons
-
-絶対パスは返しません。
-
-## Freshness / warnings
-
-`get_data_freshness` は最新actual monthと完了月を比較します。`get_warnings` は少なくとも次をfail-closeで表現します。
-
-- calculated dataset absent
-- duplicate month
-- actual rows absent
-- latest actual stale
-- latest actual contains null
+Local financial responses retain period, actual/forecast, derivation method, relative input source, SHA-256, generated time and null reason semantics. External API responses add source ID, sanitized request URL, retrieval timestamp, HTTP status, content type and raw SHA-256.
 
 ## EDINET DB boundary
 
-中央registryでは `KAFKA2306/WealthAudit` を `not_applicable` としています。個人家計・資産のcurrent contractに上場企業財務は不要なため、EDINET DBへのdirect fallbackもquota-owner projectionも追加しません。
-
-中央policy: https://github.com/KAFKA2306/semiconductor-earnings-model/blob/main/docs/edinetdb-consumer-registry.md
+個人家計・資産の core contract には EDINET DB を自動接続しません。上場企業分析が必要な別ユースケースから明示的に呼ぶ場合だけ利用し、家計 BS/PL/CF の必須依存にはしません。

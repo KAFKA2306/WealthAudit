@@ -90,10 +90,26 @@ def write_dataset(root: Path) -> None:
     ]
     pd.DataFrame(rows).to_csv(calculated / "forecast.csv", index=False)
     pd.DataFrame(
-        [{"category": "Income", "item": "salary", "parameter": "annual_growth", "value": 0.03}]
+        [
+            {
+                "category": "Income",
+                "item": "salary",
+                "parameter": "annual_growth",
+                "value": 0.03,
+            }
+        ]
     ).to_csv(calculated / "forecast_parameters.csv", index=False)
     pd.DataFrame(
-        [{"file": "forecast.csv", "key": str(cutoff), "column": "risk_assets", "before": 209.0, "after": 210.0, "delta": 1.0}]
+        [
+            {
+                "file": "forecast.csv",
+                "key": str(cutoff),
+                "column": "risk_assets",
+                "before": 209.0,
+                "after": 210.0,
+                "delta": 1.0,
+            }
+        ]
     ).to_csv(calculated / "recalculation_diff.csv", index=False)
 
 
@@ -110,7 +126,21 @@ def test_mcp_tool_catalog_is_discoverable() -> None:
         "get_warnings",
         "get_data_freshness",
         "get_audit_diff",
+        "get_external_data_sources",
+        "get_boj_time_series",
+        "get_ecb_series",
+        "get_estat_stats_data",
+        "get_jquants_daily_bars",
     }
+
+
+def test_external_source_catalog_hides_credentials(monkeypatch) -> None:
+    monkeypatch.setenv("ESTAT_APP_ID", "estat-secret")
+    monkeypatch.setenv("JQUANTS_API_KEY", "jq-secret")
+    payload = mcp_server.get_external_data_sources()
+    serialized = repr(payload)
+    assert "estat-secret" not in serialized
+    assert "jq-secret" not in serialized
 
 
 def test_latest_snapshot_is_actual_and_forecast_stays_explicit(tmp_path: Path) -> None:
@@ -184,6 +214,11 @@ def test_recalculation_diff_and_hash_provenance(tmp_path: Path) -> None:
 
 
 def test_server_is_hardcoded_to_loopback() -> None:
-    source = (Path(__file__).resolve().parents[1] / "src" / "interface_adapters" / "mcp_server.py").read_text(encoding="utf-8")
+    source = (
+        Path(__file__).resolve().parents[1]
+        / "src"
+        / "interface_adapters"
+        / "mcp_server.py"
+    ).read_text(encoding="utf-8")
     assert 'host="127.0.0.1"' in source
     assert "0.0.0.0" not in source
