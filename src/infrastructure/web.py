@@ -100,9 +100,9 @@ def create_app() -> Flask:
             ) -> list[dict[str, str]]:
                 rows: list[dict[str, str]] = []
                 for first, second in zip(left, right):
-                    if not first and not second:
+                    if not second:
                         continue
-                    if not first or not second:
+                    if not first:
                         raise ValueError("incomplete monthly input row")
                     rows.append({left_name: first, right_name: second})
                 return rows
@@ -118,9 +118,9 @@ def create_app() -> Flask:
                 for account, asset_class, balance, currency in zip(
                     asset_accounts, asset_classes, asset_balances, asset_currencies
                 ):
-                    if not account and not asset_class and not balance and not currency:
+                    if not balance:
                         continue
-                    if not account or not asset_class or not balance:
+                    if not account or not asset_class:
                         raise ValueError("incomplete monthly asset row")
                     asset_payload.append(
                         {
@@ -131,16 +131,26 @@ def create_app() -> Flask:
                         }
                     )
 
+                existing_income = load_csv("income.csv")
+                existing_expense = load_csv("expense.csv")
+                existing_assets = load_csv("assets.csv")
                 allowed_accounts = (
                     set(accounts["account_id"].astype(str))
                     if not accounts.empty and "account_id" in accounts
                     else set()
                 )
+                if not allowed_accounts:
+                    if "account_id" in existing_income:
+                        allowed_accounts.update(existing_income["account_id"].dropna().astype(str))
+                    if "account_id" in existing_assets:
+                        allowed_accounts.update(existing_assets["account_id"].dropna().astype(str))
                 allowed_methods = (
                     set(methods["method_id"].astype(str))
                     if not methods.empty and "method_id" in methods
                     else set()
                 )
+                if not allowed_methods and "method_id" in existing_expense:
+                    allowed_methods.update(existing_expense["method_id"].dropna().astype(str))
                 account_currency = (
                     dict(zip(accounts["account_id"].astype(str), accounts["currency"].astype(str)))
                     if not accounts.empty
@@ -148,7 +158,6 @@ def create_app() -> Flask:
                     and "currency" in accounts
                     else {}
                 )
-                existing_assets = load_csv("assets.csv")
                 allowed_asset_classes = (
                     set(existing_assets["asset_class"].dropna().astype(str))
                     if not existing_assets.empty and "asset_class" in existing_assets
