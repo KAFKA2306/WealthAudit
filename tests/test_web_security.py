@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from src.infrastructure.web import create_app
+from src.infrastructure.web_security import HTMX_INTEGRITY, HTMX_URL
 
 
 def test_financial_routes_fail_closed_without_configured_access_token(monkeypatch) -> None:
@@ -50,3 +51,30 @@ def test_security_headers_are_present_on_financial_responses() -> None:
     assert response.headers["X-Frame-Options"] == "DENY"
     assert response.headers["Referrer-Policy"] == "no-referrer"
     assert "frame-ancestors 'none'" in response.headers["Content-Security-Policy"]
+
+
+def test_dashboard_uses_local_plotly_and_sri_pinned_htmx() -> None:
+    response = create_app().test_client().get("/")
+    body = response.get_data(as_text=True)
+
+    assert response.status_code == 200
+    assert 'src="/static/vendor/plotly.min.js"' in body
+    assert "https://cdn.plot.ly" not in body
+    assert f'src="{HTMX_URL}"' in body
+    assert f'integrity="{HTMX_INTEGRITY}"' in body
+    assert 'crossorigin="anonymous"' in body
+    assert "https://unpkg.com" not in body
+
+    csp = response.headers["Content-Security-Policy"]
+    assert "https://cdn.jsdelivr.net" in csp
+    assert "https://cdn.plot.ly" not in csp
+    assert "https://unpkg.com" not in csp
+
+
+def test_plotly_vendor_bundle_is_served_same_origin_without_financial_auth() -> None:
+    response = create_app().test_client().get("/static/vendor/plotly.min.js")
+
+    assert response.status_code == 200
+    assert response.mimetype == "application/javascript"
+    assert "Plotly" in response.get_data(as_text=True)[:2000]
+    assert response.headers["Cache-Control"] == "public, max-age=31536000, immutable"
