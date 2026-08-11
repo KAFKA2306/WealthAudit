@@ -49,8 +49,11 @@ jobs:
         with:
           enable-cache: true
 
-      - name: Install dependencies
-        run: uv sync --frozen --extra dev --extra mcp
+      # This gate exercises only the Flask/web boundary. Keep it independent of
+      # the optional MCP adapter so an unrelated MCP lockfile change cannot
+      # suppress the security regression suite before tests even start.
+      - name: Install web security dependencies
+        run: uv sync --frozen --extra dev
 
       - name: Compile web boundary
         run: uv run python -m py_compile src/infrastructure/web.py src/infrastructure/web_security.py tests/test_web_security.py tests/test_gitignore_policy.py
