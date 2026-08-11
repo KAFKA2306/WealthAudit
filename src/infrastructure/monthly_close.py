@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import shutil
 import subprocess
 import tempfile
+import uuid
 from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 
@@ -12,6 +14,7 @@ import pandas as pd
 
 from src.use_cases.monthly_close import (
     AuditStatus,
+    MonthlyCloseError,
     MonthlyCloseResult,
     MonthlyCloseStage,
 )
@@ -43,16 +46,67 @@ class FilesystemMonthlyClosePort:
         self.input_dir = self.repo_root / "data" / "input"
         self.calculated_dir = self.repo_root / "data" / "calculated"
         self.state_path = self.repo_root / "data" / "state" / "monthly-close.json"
-        self._updates = dict(updates or {})
-        self._command_runner = command_runner or self._run_command
-        self._temporary = tempfile.TemporaryDirectory(prefix="wealthaudit-monthly-close-")
-        self._temp_root = Path(self._temporary.name)
-        self._prepared_input = self._prepare_input()
-        self._input_snapshot = self._snapshot_dir(self.input_dir, "input.original")
-        self._calculated_snapshot = self._snapshot_dir(
-            self.calculated_dir, "calculated.original"
-        )
-        self._collected = False
+        self._lock_dir = self.repo_root / "data" / "state" / "monthly-close.lock"
+        self._lock_token = uuid.uuid4().hex
+        self._lock_acquired = False
+        self._temporary: tempfile.TemporaryDirectory[str] | None = None
+        self._acquire_lock()
+        try:
+            self._updates = dict(updates or {})
+            self._command_runner = command_runner or self._run_command
+            self._temporary = tempfile.TemporaryDirectory(
+                prefix="wealthaudit-monthly-close-"
+            )
+            self._temp_root = Path(self._temporary.name)
+            self._prepared_input = self._prepare_input()
+            self._input_snapshot = self._snapshot_dir(self.input_dir, "input.original")
+            self._calculated_snapshot = self._snapshot_dir(
+                self.calculated_dir, "calculated.original"
+            )
+            self._collected = False
+        except Exception:
+            self._release_lock()
+            raise
+
+    def _acquire_lock(self) -> None:
+        self._lock_dir.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            self._lock_dir.mkdir()
+        except FileExistsError as exc:
+            raise MonthlyCloseError(
+                "another monthly close is already in progress"
+            ) from exc
+
+        marker = self._lock_dir / "owner.json"
+        try:
+            marker.write_text(
+                json.dumps(
+                    {"pid": os.getpid(), "token": self._lock_token},
+                    ensure_ascii=False,
+                    sort_keys=True,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+        except Exception:
+            self._lock_dir.rmdir()
+            raise
+        self._lock_acquired = True
+
+    def _release_lock(self) -> None:
+        if not self._lock_acquired:
+            return
+        marker = self._lock_dir / "owner.json"
+        try:
+            payload = json.loads(marker.read_text(encoding="utf-8"))
+            if payload.get("token") != self._lock_token:
+                return
+            marker.unlink()
+            self._lock_dir.rmdir()
+            self._lock_acquired = False
+        except (FileNotFoundError, json.JSONDecodeError, OSError):
+            # Fail closed: never remove a lock whose ownership cannot be proven.
+            return
 
     @staticmethod
     def _run_command(command: Sequence[str], cwd: Path) -> None:
@@ -177,4 +231,8 @@ class FilesystemMonthlyClosePort:
             shutil.copytree(snapshot, destination)
 
     def cleanup(self) -> None:
-        self._temporary.cleanup()
+        try:
+            if self._temporary is not None:
+                self._temporary.cleanup()
+        finally:
+            self._release_lock()
