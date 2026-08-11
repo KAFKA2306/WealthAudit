@@ -35,7 +35,9 @@ def _clean_value(value: object) -> object:
     return value
 
 
-def _clean_row(row: pd.Series, fields: Iterable[str]) -> tuple[dict[str, object], dict[str, str]]:
+def _clean_row(
+    row: pd.Series, fields: Iterable[str]
+) -> tuple[dict[str, object], dict[str, str]]:
     values: dict[str, object] = {}
     null_reasons: dict[str, str] = {}
     for field in fields:
@@ -88,7 +90,9 @@ class FinancialReadModel:
                 "null_reason": "artifact_not_materialized",
             }
         raw = path.read_bytes()
-        modified = datetime.fromtimestamp(path.stat().st_mtime, UTC).replace(microsecond=0)
+        modified = datetime.fromtimestamp(path.stat().st_mtime, UTC).replace(
+            microsecond=0
+        )
         return {
             "input_source": str(relative).replace("\\", "/"),
             "input_hash": hashlib.sha256(raw).hexdigest(),
@@ -100,19 +104,52 @@ class FinancialReadModel:
     def _actual_or_forecast(row: pd.Series) -> str:
         return "forecast" if bool(row["is_forecast"]) else "actual"
 
-    def _row_payload(self, row: pd.Series, fields: Iterable[str], *, derivation: str) -> dict[str, object]:
-        values, null_reasons = _clean_row(row, fields)
+    def _provenance_envelope(
+        self,
+        *,
+        period: str,
+        actual_or_forecast: str,
+        derivation: str,
+        relative: Path = FORECAST_FILE,
+    ) -> dict[str, object]:
+        artifact = self._artifact_meta(relative)
+        stale = actual_or_forecast == "actual" and period < last_completed_month()
         return {
-            "schema_version": "wealthaudit.financial-row.v1",
-            "period": str(row["month"]),
-            "actual_or_forecast": self._actual_or_forecast(row),
-            "values": values,
-            "null_reasons": null_reasons,
+            "canonical_id": f"wealthaudit:{actual_or_forecast}:{period}",
+            "data_as_of": period,
+            "generated_at": artifact["generated_at"],
+            "input_source": artifact["input_source"],
+            "input_hash": artifact["input_hash"],
+            "freshness": "stale" if stale else "snapshot",
+            "stale": stale,
+            "null_reason": artifact["null_reason"],
             "derivation_method": derivation,
-            "provenance": self._artifact_meta(),
+            "assumptions": [],
+            "provenance": artifact,
         }
 
-    def _select_period(self, period: str | None, *, forecast: bool | None = None) -> pd.Series | None:
+    def _row_payload(
+        self, row: pd.Series, fields: Iterable[str], *, derivation: str
+    ) -> dict[str, object]:
+        values, null_reasons = _clean_row(row, fields)
+        period = str(row["month"])
+        actual_or_forecast = self._actual_or_forecast(row)
+        return {
+            "schema_version": "wealthaudit.financial-row.v1",
+            "period": period,
+            "actual_or_forecast": actual_or_forecast,
+            "values": values,
+            "null_reasons": null_reasons,
+            **self._provenance_envelope(
+                period=period,
+                actual_or_forecast=actual_or_forecast,
+                derivation=derivation,
+            ),
+        }
+
+    def _select_period(
+        self, period: str | None, *, forecast: bool | None = None
+    ) -> pd.Series | None:
         frame = self._load_forecast()
         if forecast is not None:
             frame = frame[frame["is_forecast"] == forecast]
@@ -125,7 +162,11 @@ class FinancialReadModel:
     def financial_snapshot(self, period: str | None = None) -> dict[str, object]:
         row = self._select_period(period, forecast=False if period is None else None)
         if row is None:
-            return {"available": False, "null_reason": "period_not_materialized", "period": period}
+            return {
+                "available": False,
+                "null_reason": "period_not_materialized",
+                "period": period,
+            }
         fields = (
             "liquid_assets",
             "risk_assets",
@@ -141,20 +182,36 @@ class FinancialReadModel:
             "fi_ratio_48m",
             "fi_ratio_next_12m",
         )
-        payload = self._row_payload(row, fields, derivation="materialized forecast.csv read model")
-        assets = [payload["values"].get(name) for name in ("liquid_assets", "risk_assets", "pension_assets")]  # type: ignore[union-attr]
-        payload["net_worth"] = sum(float(value) for value in assets if value is not None)
+        payload = self._row_payload(
+            row, fields, derivation="materialized forecast.csv read model"
+        )
+        assets = [
+            payload["values"].get(name)
+            for name in ("liquid_assets", "risk_assets", "pension_assets")
+        ]  # type: ignore[union-attr]
+        payload["net_worth"] = sum(
+            float(value) for value in assets if value is not None
+        )
         return {"available": True, **payload}
 
     def balance_sheet(self, period: str | None = None) -> dict[str, object]:
         row = self._select_period(period, forecast=False if period is None else None)
         if row is None:
-            return {"available": False, "null_reason": "period_not_materialized", "period": period}
+            return {
+                "available": False,
+                "null_reason": "period_not_materialized",
+                "period": period,
+            }
         return {
             "available": True,
             **self._row_payload(
                 row,
-                ("liquid_assets", "risk_assets", "pension_assets", "total_financial_assets"),
+                (
+                    "liquid_assets",
+                    "risk_assets",
+                    "pension_assets",
+                    "total_financial_assets",
+                ),
                 derivation="scripts/forecast.py calculated balance-sheet projection",
             ),
         }
@@ -162,22 +219,47 @@ class FinancialReadModel:
     def cash_flow(self, period: str | None = None) -> dict[str, object]:
         row = self._select_period(period, forecast=False if period is None else None)
         if row is None:
-            return {"available": False, "null_reason": "period_not_materialized", "period": period}
-        values = ("after_tax_income", "expenditure", "net_savings", "asset_contribution", "net_worth_contribution", "investment_gain_loss")
-        payload = self._row_payload(row, values, derivation="materialized cash-flow formulas shared with dashboard")
+            return {
+                "available": False,
+                "null_reason": "period_not_materialized",
+                "period": period,
+            }
+        values = (
+            "after_tax_income",
+            "expenditure",
+            "net_savings",
+            "asset_contribution",
+            "net_worth_contribution",
+            "investment_gain_loss",
+        )
+        payload = self._row_payload(
+            row,
+            values,
+            derivation="materialized cash-flow formulas shared with dashboard",
+        )
         one = pd.DataFrame([row])
         try:
-            payload["values"]["total_wealth_flow"] = _clean_value(total_wealth_flow(one).iloc[-1])  # type: ignore[index]
+            payload["values"]["total_wealth_flow"] = _clean_value(
+                total_wealth_flow(one).iloc[-1]
+            )  # type: ignore[index]
         except KeyError:
             payload["values"]["total_wealth_flow"] = None  # type: ignore[index]
-            payload["null_reasons"]["total_wealth_flow"] = "required_flow_column_missing"  # type: ignore[index]
+            payload["null_reasons"][
+                "total_wealth_flow"
+            ] = "required_flow_column_missing"  # type: ignore[index]
         return {"available": True, **payload}
 
     def asset_allocation(self, period: str | None = None) -> dict[str, object]:
         row = self._select_period(period, forecast=False if period is None else None)
         if row is None:
-            return {"available": False, "null_reason": "period_not_materialized", "period": period}
-        table = self.graphs._prepare_table_frame("allocation", pd.DataFrame([row]))
+            return {
+                "available": False,
+                "null_reason": "period_not_materialized",
+                "period": period,
+            }
+        table = self.graphs._prepare_table_frame(
+            "allocation", pd.DataFrame([row])
+        )
         prepared = table.iloc[-1]
         return {
             "available": True,
@@ -198,12 +280,22 @@ class FinancialReadModel:
     def investment_returns(self, period: str | None = None) -> dict[str, object]:
         row = self._select_period(period, forecast=False if period is None else None)
         if row is None:
-            return {"available": False, "null_reason": "period_not_materialized", "period": period}
+            return {
+                "available": False,
+                "null_reason": "period_not_materialized",
+                "period": period,
+            }
         return {
             "available": True,
             **self._row_payload(
                 row,
-                ("raw_monthly_return", "monthly_return", "raw_benchmark_return", "benchmark_return", "monthly_alpha"),
+                (
+                    "raw_monthly_return",
+                    "monthly_return",
+                    "raw_benchmark_return",
+                    "benchmark_return",
+                    "monthly_alpha",
+                ),
                 derivation="scripts/forecast.py calculate_metrics_vectorized",
             ),
         }
@@ -211,12 +303,22 @@ class FinancialReadModel:
     def fi_metrics(self, period: str | None = None) -> dict[str, object]:
         row = self._select_period(period, forecast=False if period is None else None)
         if row is None:
-            return {"available": False, "null_reason": "period_not_materialized", "period": period}
+            return {
+                "available": False,
+                "null_reason": "period_not_materialized",
+                "period": period,
+            }
         return {
             "available": True,
             **self._row_payload(
                 row,
-                ("savings_rate", "risk_asset_ratio", "fi_ratio_12m", "fi_ratio_48m", "fi_ratio_next_12m"),
+                (
+                    "savings_rate",
+                    "risk_asset_ratio",
+                    "fi_ratio_12m",
+                    "fi_ratio_48m",
+                    "fi_ratio_next_12m",
+                ),
                 derivation="scripts/forecast.py calculate_metrics_vectorized",
             ),
         }
@@ -241,12 +343,25 @@ class FinancialReadModel:
         assumptions = []
         assumptions_meta = self._artifact_meta(PARAMETERS_FILE)
         if parameter_path.is_file():
-            assumptions = pd.read_csv(parameter_path).replace({float("nan"): None}).to_dict(orient="records")
+            assumptions = (
+                pd.read_csv(parameter_path)
+                .replace({float("nan"): None})
+                .to_dict(orient="records")
+            )
+        items = [
+            self._row_payload(
+                row, fields, derivation="scripts/forecast.py deterministic forecast"
+            )
+            for _, row in future.iterrows()
+        ]
+        for item in items:
+            item["assumptions"] = assumptions
+            item["assumptions_provenance"] = assumptions_meta
         return {
             "schema_version": "wealthaudit.forecast.v1",
             "actual_or_forecast": "forecast",
             "count": len(future),
-            "items": [self._row_payload(row, fields, derivation="scripts/forecast.py deterministic forecast") for _, row in future.iterrows()],
+            "items": items,
             "assumptions": assumptions,
             "assumptions_provenance": assumptions_meta,
         }
@@ -271,9 +386,18 @@ class FinancialReadModel:
             latest = str(actual.iloc[-1]["month"])
             cutoff = last_completed_month()
             if latest < cutoff:
-                warnings.append({"code": "actual_data_stale", "severity": "warning", "latest_period": latest, "expected_through": cutoff})
+                warnings.append(
+                    {
+                        "code": "actual_data_stale",
+                        "severity": "warning",
+                        "latest_period": latest,
+                        "expected_through": cutoff,
+                    }
+                )
             if actual.iloc[-1].isna().any():
-                warnings.append({"code": "latest_actual_contains_null", "severity": "warning"})
+                warnings.append(
+                    {"code": "latest_actual_contains_null", "severity": "warning"}
+                )
         return {
             "schema_version": "wealthaudit.warnings.v1",
             "status": "ok" if not warnings else "warning",
@@ -289,11 +413,19 @@ class FinancialReadModel:
         actual = frame[~frame["is_forecast"]]
         latest = None if actual.empty else str(actual.iloc[-1]["month"])
         cutoff = last_completed_month()
+        stale = latest is None or latest < cutoff
         return {
             "available": True,
+            "canonical_id": "wealthaudit:data-freshness",
+            "schema_version": "wealthaudit.data-freshness.v1",
+            "data_as_of": latest,
             "latest_actual_period": latest,
             "expected_through": cutoff,
-            "stale": latest is None or latest < cutoff,
+            "freshness": "stale" if stale else "current",
+            "stale": stale,
+            "derivation_method": "forecast.csv latest actual period versus last completed month",
+            "assumptions": [],
+            "provenance": meta,
             "edinetdb_mode": "not_applicable",
             **meta,
         }
@@ -316,8 +448,18 @@ class FinancialReadModel:
         for _, row in frame.iterrows():
             items.append({key: _clean_value(value) for key, value in row.items()})
         return {
+            "canonical_id": "wealthaudit:audit-diff",
             "schema_version": "wealthaudit.audit-diff.v1",
             "available": True,
+            "data_as_of": None,
+            "generated_at": meta["generated_at"],
+            "input_source": meta["input_source"],
+            "input_hash": meta["input_hash"],
+            "freshness": "snapshot",
+            "stale": False,
+            "null_reason": None,
+            "derivation_method": "materialized recalculation_diff.csv audit output",
+            "assumptions": [],
             "count": len(items),
             "items": items,
             "provenance": meta,

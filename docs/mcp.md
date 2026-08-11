@@ -2,6 +2,14 @@
 
 WealthAudit の MCP は `127.0.0.1` に固定した read-only gateway です。家計・資産の raw input を公開せず、既存の計算結果と、allow-list 済みの公式外部 API だけを読み出します。外部 API は **データ取得源**であり、BS/PL/CF や FI 指標の計算エンジンではありません。
 
+## Protocol / SDK
+
+新規MCP実装は正式MCP `2026-07-28` とMCP Python SDK v2を基準にします。SDK v2の高水準server classである `MCPServer` を使い、2026-07-28側では旧 `initialize` / `initialized` handshakeや `Mcp-Session-Id` を新規依存にしません。
+
+- MCP specification release: https://modelcontextprotocol.io/specification/2026-07-28
+- MCP Python SDK: https://github.com/modelcontextprotocol/python-sdk
+- SDK v2 changes: https://github.com/modelcontextprotocol/python-sdk/blob/main/docs/whats-new.md
+
 ## Privacy boundary
 
 - bind 先は `127.0.0.1` 固定
@@ -57,9 +65,46 @@ J-Quants が公開している `J-Quants/j-quants-doc-mcp` は API 仕様検索�
 - J-Quants official Python V2 client: https://github.com/J-Quants/jquants-api-client-python
 - J-Quants official documentation MCP: https://github.com/J-Quants/j-quants-doc-mcp
 
-## Provenance
+## Provenance contract
 
-Local financial responses retain period, actual/forecast, derivation method, relative input source, SHA-256, generated time and null reason semantics. External API responses add source ID, sanitized request URL, retrieval timestamp, HTTP status, content type and raw SHA-256.
+利用可能なlocal financial rowは、値だけでなく次のmachine-readable envelopeを返します。
+
+- `canonical_id`: `wealthaudit:actual:<YYYY-MM>` または `wealthaudit:forecast:<YYYY-MM>`
+- `schema_version`
+- `period`
+- `actual_or_forecast`
+- `data_as_of`
+- `generated_at`
+- `input_source`: repository-relative pathのみ
+- `input_hash`: SHA-256
+- `freshness`
+- `stale`
+- `null_reason`
+- `derivation_method`
+- `assumptions`
+- `provenance`
+
+`input_source` は絶対ローカルpathを返しません。`input_hash` と `provenance.input_hash` は同じmaterialized artifactを指します。forecast itemにはそのrunで読み込んだmaterialized assumptionsを明示し、actual itemでは仮定を勝手に生成しません。
+
+未materialize、欠損、計算不能は0へ変換せず `null_reason` / `null_reasons` でfail-closeします。`get_data_freshness` と `get_audit_diff` も独立したcanonical ID、hash、生成時点、derivationを返します。
+
+External API responsesは source ID、sanitized request URL、retrieval timestamp、HTTP status、content type、raw SHA-256を保持し、credential値をprovenanceへ混入させません。
+
+## CI contract
+
+`.github/workflows/mcp-contract.yml` は以下をblocking gateとして実行します。
+
+1. Python syntax
+2. Ruff
+3. MCP tool discovery
+4. actual / forecast分離
+5. dashboard / domain / MCP計算parity
+6. null-not-zero
+7. provenance必須fieldとSHA-256
+8. absolute private path / credential非公開
+9. missing dataset / stale dataのfail-close
+10. private operational fileのgitignore契約
+11. runtime cacheを除去した後の `git status --porcelain --untracked-files=all` が空であること
 
 ## EDINET DB boundary
 
