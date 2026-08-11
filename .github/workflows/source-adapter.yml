@@ -26,13 +26,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
-      - run: uv sync --frozen --extra dev --extra mcp
+      - run: uv sync --frozen --extra dev
       - name: Compile adapter
-        run: uv run python -m py_compile src/use_cases/source_adapter.py tests/test_source_adapter.py
+        run: uv run --frozen python -m py_compile src/use_cases/source_adapter.py tests/test_source_adapter.py
       - name: Adapter tests
-        run: uv run pytest -q tests/test_source_adapter.py
+        run: uv run --frozen pytest -q tests/test_source_adapter.py
       - name: Full regression suite
-        run: uv run pytest -q
+        run: uv run --frozen --with "mcp>=2,<3" pytest -q
       - name: Reject tracked raw or secret-like runtime artifacts
         run: |
           if git ls-files | grep -E '(^data/|(^|/)(cookies?|tokens?|raw|staging)(/|$)|\.html\.dump$)' ; then
