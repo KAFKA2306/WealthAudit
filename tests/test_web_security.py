@@ -77,4 +77,4 @@ def test_plotly_vendor_bundle_is_served_same_origin_without_financial_auth() -> 
     assert response.status_code == 200
     assert response.mimetype == "application/javascript"
     assert "Plotly" in response.get_data(as_text=True)[:2000]
-    assert response.headers["Cache-Control"] == "public, max-age=31536000, immutable"
+    assert "no-store" in response.headers["Cache-Control"]
