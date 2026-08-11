@@ -21,9 +21,20 @@ def _history_for(path: str) -> list[str]:
     return [line for line in result.stdout.splitlines() if line]
 
 
+def _tracked_in_head(path: str) -> bool:
+    result = subprocess.run(
+        ["git", "ls-tree", "-r", "--name-only", "HEAD", "--", path],
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    return path in result.stdout.splitlines()
+
+
 def test_private_financial_masters_are_absent_from_current_tree() -> None:
     for path in SENSITIVE_MASTER_PATHS:
-        assert not Path(path).exists(), f"private financial master is tracked: {path}"
+        assert not _tracked_in_head(path), f"private financial master is tracked: {path}"
 
 
 def test_any_historical_exposure_is_explicitly_recorded_in_policy() -> None:
