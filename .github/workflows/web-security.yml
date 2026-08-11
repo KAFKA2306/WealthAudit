@@ -50,14 +50,13 @@ jobs:
           enable-cache: true
 
       # Keep the targeted web-security regression independent from the optional
-      # MCP adapter so its failures cannot suppress the security checks. The
-      # repository-wide regression adds MCP as an ephemeral overlay while
-      # --frozen prevents the stale project lock from being rewritten.
+      # MCP adapter so its failures cannot suppress the security checks. Every
+      # project-aware uv invocation is frozen so CI can never rewrite uv.lock.
       - name: Install web security dependencies
         run: uv sync --frozen --extra dev
 
       - name: Compile web boundary
-        run: uv run python -m py_compile src/infrastructure/web.py src/infrastructure/web_security.py tests/test_web_security.py tests/test_gitignore_policy.py
+        run: uv run --frozen python -m py_compile src/infrastructure/web.py src/infrastructure/web_security.py tests/test_web_security.py tests/test_gitignore_policy.py
 
       - name: Reject unsafe Flask development defaults
         run: |
@@ -74,7 +73,7 @@ jobs:
           grep -Fx '/master/payment_methods.csv' .gitignore
 
       - name: Run web security regression tests
-        run: uv run pytest -q tests/test_web_security.py tests/test_web_input_safety.py tests/test_input_template.py tests/test_gitignore_policy.py
+        run: uv run --frozen pytest -q tests/test_web_security.py tests/test_web_input_safety.py tests/test_input_template.py tests/test_gitignore_policy.py
 
       - name: Run full regression suite
         run: uv run --frozen --with "mcp>=2,<3" pytest -q
