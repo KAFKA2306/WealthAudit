@@ -1,0 +1,40 @@
+name: Repository Ratchet
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  ratchet:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Verify canonical financial flow
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f docs/canonical-flow.md
+          test -d master
+          test -d src/domain
+          test -d src/use_cases
+          test -f src/infrastructure/web.py
+          test -d templates
+          test ! -e .github/workflows/weekly-repo-research.yml
+          grep -q 'freshness' docs/canonical-flow.md
+          grep -q 'integrity pass rate' docs/canonical-flow.md
+          grep -q 'manual corrections' docs/canonical-flow.md
+      - name: Verify private financial artifacts stay ignored
+        shell: bash
+        run: |
+          set -euo pipefail
+          git check-ignore -q data || git check-ignore -q data/input || true
+          grep -Eq '(^|/)data/?$|data/' .gitignore
+          grep -Eq 'input\.xlsx|\*\.xlsx' .gitignore
+      - name: Verify clean checkout
+        shell: bash
+        run: |
+          test -z "$(git status --porcelain --untracked-files=all)"
