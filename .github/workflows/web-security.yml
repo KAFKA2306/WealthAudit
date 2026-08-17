@@ -19,7 +19,7 @@ on:
       - "master/**"
       - "docs/private-master-migration.md"
       - ".gitignore"
-      - ".github/workflows/web-security.yml"
+      - ".github/workflows/**"
   push:
     branches: [main]
     paths:
@@ -39,7 +39,7 @@ on:
       - "master/**"
       - "docs/private-master-migration.md"
       - ".gitignore"
-      - ".github/workflows/web-security.yml"
+      - ".github/workflows/**"
 
 permissions:
   contents: read
