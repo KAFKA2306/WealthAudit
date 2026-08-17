@@ -1,5 +1,9 @@
 # WealthAudit — 個人資産の計算・予測・警告を分離する財務監査基盤
 
+[![Asset ledger contract](https://github.com/KAFKA2306/WealthAudit/actions/workflows/asset-ledger-contract.yml/badge.svg)](https://github.com/KAFKA2306/WealthAudit/actions/workflows/asset-ledger-contract.yml)
+[![Validate monthly close state machine](https://github.com/KAFKA2306/WealthAudit/actions/workflows/monthly-close.yml/badge.svg)](https://github.com/KAFKA2306/WealthAudit/actions/workflows/monthly-close.yml)
+[![Validate web security boundary](https://github.com/KAFKA2306/WealthAudit/actions/workflows/web-security.yml/badge.svg)](https://github.com/KAFKA2306/WealthAudit/actions/workflows/web-security.yml)
+
 WealthAuditは、収入、支出、資産残高、市場データから、個人の貸借対照表、キャッシュフロー、資産配分、投資収益、FI指標、将来予測を再計算し、ローカルのWebダッシュボードで確認するための個人財務ワークスペースです。
 
 単にグラフを表示するだけではなく、**実績と予測を分離し、入力不足、データの古さ、計算不能を警告として見せること**を重視します。
