@@ -73,7 +73,15 @@ def test_run_returns_canonical_tables_and_versionable_provenance():
     assert result.provenance.fetched_at == "2026-08-10T00:00:00+00:00"
     assert result.provenance.source_published_at == "2026-08-01T00:00:00Z"
     assert result.provenance.status == "success"
+    assert result.provenance.runtime_verification == "UNVERIFIED"
+    assert result.provenance.raw_record_count == 1
     assert result.provenance.record_count == 1
+    assert result.provenance.table_record_counts == {
+        "income": 1,
+        "expense": 0,
+        "assets": 0,
+        "market": 0,
+    }
     assert len(result.provenance.content_hash) == 64
     assert set(result.tables) == {"income", "expense", "assets", "market"}
 
@@ -168,8 +176,11 @@ def test_provenance_writer_contains_only_audit_metadata(tmp_path: Path):
         "source_published_at",
         "provenance",
         "record_count",
+        "raw_record_count",
+        "table_record_counts",
         "content_hash",
         "status",
+        "runtime_verification",
     }
     serialized = path.read_text(encoding="utf-8").lower()
     assert "token" not in serialized
