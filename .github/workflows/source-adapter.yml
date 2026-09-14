@@ -5,9 +5,11 @@ on:
     branches: [main]
     paths:
       - "src/use_cases/source_adapter.py"
+      - "src/infrastructure/source_adapter_monthly.py"
       - "src/interface_adapters/official_apis.py"
       - "src/interface_adapters/source_registry.py"
       - "tests/test_source_adapter.py"
+      - "tests/test_source_adapter_monthly.py"
       - "tests/test_official_apis.py"
       - "docs/source-adapters.md"
       - ".github/workflows/source-adapter.yml"
@@ -15,9 +17,11 @@ on:
   pull_request:
     paths:
       - "src/use_cases/source_adapter.py"
+      - "src/infrastructure/source_adapter_monthly.py"
       - "src/interface_adapters/official_apis.py"
       - "src/interface_adapters/source_registry.py"
       - "tests/test_source_adapter.py"
+      - "tests/test_source_adapter_monthly.py"
       - "tests/test_official_apis.py"
       - "docs/source-adapters.md"
       - ".github/workflows/source-adapter.yml"
@@ -40,12 +44,14 @@ jobs:
         run: >-
           python -m py_compile
           src/use_cases/source_adapter.py
+          src/infrastructure/source_adapter_monthly.py
           src/interface_adapters/official_apis.py
           src/interface_adapters/source_registry.py
           tests/test_source_adapter.py
+          tests/test_source_adapter_monthly.py
           tests/test_official_apis.py
       - name: Adapter tests
-        run: pytest -q tests/test_source_adapter.py tests/test_official_apis.py
+        run: pytest -q tests/test_source_adapter.py tests/test_source_adapter_monthly.py tests/test_official_apis.py
       - name: Full regression suite
         run: pytest -q
       - name: Reject tracked raw or secret-like runtime artifacts
