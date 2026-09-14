@@ -3,10 +3,22 @@
 WealthAudit の取得境界は次に固定します。
 
 ```text
-authenticate -> fetch raw -> parse -> normalize -> validate -> handoff
+auth result -> fetch raw -> parse -> normalize -> validate -> handoff
 ```
 
 provider 固有の認証・field mapping・pagination は adapter / API client に閉じ込め、BS/PL/CF・FI・forecast の計算は既存 domain / use-case 層だけで行います。
+
+## Authentication result boundary
+
+`SourceAdapter.authenticate()` は必ず `AuthResult` を返します。状態は `success | cancel | timeout | failure | unavailable` の5種類です。`success` だけが一時的な auth context を持てます。その他の状態は context を持てず、`SourceAdapter.run()` は fetch を開始する前に fail closed します。
+
+この境界は Android / OS / browser / third-party provider から返る認証結果を受けるための repository-owned contract です。password、OTP、passkey秘密鍵を保存・模倣しません。実端末で本人承認が成功することは repository completion の条件ではありません。
+
+## Source metadata / provenance
+
+各 adapter は `SourceContract` を宣言し、少なくとも `source_id`、`acquisition_method`、`auth_mode`、`supported_period`、一次情報を示す `provenance` を固定します。成功した取得だけが `SourceProvenance` を生成し、`fetched_at`、取得できる場合の `source_published_at`、`record_count`、raw response の `content_hash`、`status=success` を保存します。
+
+取消・期限切れ・失敗・利用不能では成功 provenance を生成しません。未取得を0件や正常終了へ変換しません。
 
 ## Canonical handoff
 
