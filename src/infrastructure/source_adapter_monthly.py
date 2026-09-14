@@ -45,7 +45,8 @@ def execute_source_monthly_close(
 
     Authentication must succeed before adapter ``fetch`` can run. The adapter's validated
     canonical tables are the only updates handed to the existing monthly-close authority.
-    Successful acquisition provenance is retained separately from calculation/close state.
+    Provenance is advanced only after the monthly close succeeds, so a failed calculation
+    cannot make an uncommitted source payload look like the currently closed state.
     """
 
     adapter_result = adapter.run(
@@ -54,14 +55,15 @@ def execute_source_monthly_close(
         known_payment_methods=known_payment_methods,
         fetched_at=fetched_at,
     )
-    write_provenance(
-        repo_root / "data" / "state" / f"source-{adapter_result.provenance.source_id}.json",
-        adapter_result.provenance,
-    )
     port = FilesystemMonthlyClosePort(
         repo_root,
         target_month,
         updates=adapter_result_to_monthly_updates(adapter_result),
         command_runner=command_runner,
     )
-    return MonthlyCloseWorkflow().execute(port)
+    result = MonthlyCloseWorkflow().execute(port)
+    write_provenance(
+        repo_root / "data" / "state" / f"source-{adapter_result.provenance.source_id}.json",
+        adapter_result.provenance,
+    )
+    return result
