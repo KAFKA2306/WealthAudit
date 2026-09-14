@@ -68,8 +68,11 @@ class SourceProvenance:
     source_published_at: str | None
     provenance: str
     record_count: int
+    raw_record_count: int
+    table_record_counts: Mapping[str, int]
     content_hash: str
     status: Literal["success"] = "success"
+    runtime_verification: Literal["UNVERIFIED", "VERIFIED"] = "UNVERIFIED"
 
 
 @dataclass(frozen=True)
@@ -173,6 +176,7 @@ class SourceAdapter(ABC):
             known_accounts=known_accounts,
             known_payment_methods=known_payment_methods,
         )
+        table_record_counts = {table: len(rows) for table, rows in tables.items()}
         provenance = SourceProvenance(
             source_id=contract.source_id,
             acquisition_method=contract.acquisition_method,
@@ -181,7 +185,9 @@ class SourceAdapter(ABC):
             fetched_at=fetched_at or datetime.now(timezone.utc).isoformat(),
             source_published_at=self.source_published_at(records),
             provenance=contract.provenance,
-            record_count=sum(len(rows) for rows in tables.values()),
+            record_count=sum(table_record_counts.values()),
+            raw_record_count=len(records),
+            table_record_counts=table_record_counts,
             content_hash=hashlib.sha256(raw).hexdigest(),
         )
         return AdapterResult(tables=tables, provenance=provenance)
