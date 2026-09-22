@@ -1,0 +1,14 @@
+{
+  "schema_version": "wealthaudit.driver-commands.v1",
+  "drivers": [
+    {
+      "source_id": "rakuten_card",
+      "argv": [
+        "python",
+        "/absolute/local/path/provider_drivers/rakuten_card_export.py"
+      ],
+      "timeout_seconds": 600,
+      "working_directory": null
+    }
+  ]
+}
