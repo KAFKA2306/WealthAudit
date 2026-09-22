@@ -24,8 +24,18 @@ def _policy() -> SourcePolicy:
     )
 
 
-def _python_driver(payload: dict[str, object]) -> tuple[str, ...]:
-    script = "import json; print(json.dumps(" + repr(payload) + "))"
+def _python_driver(
+    payload: dict[str, object],
+    *,
+    exit_code: int = 0,
+) -> tuple[str, ...]:
+    script = (
+        "import json,sys; "
+        + "print(json.dumps("
+        + repr(payload)
+        + ")); "
+        + f"sys.exit({exit_code})"
+    )
     return (sys.executable, "-c", script)
 
 
@@ -68,12 +78,30 @@ def test_command_driver_preserves_auth_boundary(tmp_path: Path):
     config = CommandDriverConfig(
         source_id="provider",
         argv=_python_driver(
-            {"status": "AUTH_REQUIRED", "error_code": "PASSKEY_REQUIRED"}
+            {"status": "AUTH_REQUIRED", "error_code": "PASSKEY_REQUIRED"},
+            exit_code=20,
         ),
     )
     result = CommandDriver(config, incoming_root=tmp_path).acquire(_policy())
     assert result.status == "AUTH_REQUIRED"
     assert result.error_code == "PASSKEY_REQUIRED"
+
+
+def test_nonzero_exit_cannot_claim_success(tmp_path: Path):
+    incoming = tmp_path / "incoming"
+    incoming.mkdir()
+    export = incoming / "statement.csv"
+    export.write_text("ok", encoding="utf-8")
+    config = CommandDriverConfig(
+        source_id="provider",
+        argv=_python_driver(
+            {"status": "SUCCESS", "path": str(export)},
+            exit_code=7,
+        ),
+    )
+    result = CommandDriver(config, incoming_root=incoming).acquire(_policy())
+    assert result.status == "FAILED"
+    assert result.error_code == "DRIVER_EXIT_7"
 
 
 def test_driver_config_is_local_and_machine_readable(tmp_path: Path):
