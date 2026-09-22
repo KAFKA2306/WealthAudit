@@ -8,11 +8,16 @@ on:
       - "src/use_cases/finance_acquisition.py"
       - "src/use_cases/finance_runner.py"
       - "src/infrastructure/finance_sync_cli.py"
+      - "src/interface_adapters/command_driver.py"
       - "src/interface_adapters/official_apis.py"
       - "src/interface_adapters/source_registry.py"
       - "config/finance_sources.json"
+      - "config/driver_commands.example.json"
+      - "scripts/install_finance_scheduler.ps1"
+      - "scripts/uninstall_finance_scheduler.ps1"
       - "tests/test_source_adapter.py"
       - "tests/test_finance_acquisition.py"
+      - "tests/test_command_driver.py"
       - "tests/test_official_apis.py"
       - "docs/source-adapters.md"
       - ".github/workflows/source-adapter.yml"
@@ -23,11 +28,16 @@ on:
       - "src/use_cases/finance_acquisition.py"
       - "src/use_cases/finance_runner.py"
       - "src/infrastructure/finance_sync_cli.py"
+      - "src/interface_adapters/command_driver.py"
       - "src/interface_adapters/official_apis.py"
       - "src/interface_adapters/source_registry.py"
       - "config/finance_sources.json"
+      - "config/driver_commands.example.json"
+      - "scripts/install_finance_scheduler.ps1"
+      - "scripts/uninstall_finance_scheduler.ps1"
       - "tests/test_source_adapter.py"
       - "tests/test_finance_acquisition.py"
+      - "tests/test_command_driver.py"
       - "tests/test_official_apis.py"
       - "docs/source-adapters.md"
       - ".github/workflows/source-adapter.yml"
@@ -53,15 +63,19 @@ jobs:
           src/use_cases/finance_acquisition.py
           src/use_cases/finance_runner.py
           src/infrastructure/finance_sync_cli.py
+          src/interface_adapters/command_driver.py
           src/interface_adapters/official_apis.py
           src/interface_adapters/source_registry.py
           tests/test_source_adapter.py
           tests/test_finance_acquisition.py
+          tests/test_command_driver.py
           tests/test_official_apis.py
       - name: Adapter and acquisition tests
         run: pytest -q tests/test_source_adapter.py tests/test_finance_acquisition.py tests/test_command_driver.py tests/test_official_apis.py
       - name: Finance acquisition plan smoke test
         run: python -m src.infrastructure.finance_sync_cli plan >/tmp/finance-plan.json
+      - name: Finance unattended run smoke test
+        run: python -m src.infrastructure.finance_sync_cli --data-root /tmp/wealthaudit-finance run >/tmp/finance-run.json
       - name: Full regression suite
         run: pytest -q
       - name: Reject tracked raw or secret-like runtime artifacts
