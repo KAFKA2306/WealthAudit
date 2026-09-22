@@ -63,6 +63,11 @@ tasks:
     cmds:
       - uv run python -m src.infrastructure.finance_sync_cli plan {{.CLI_ARGS}}
 
+  finance:run:
+    desc: Run due provider drivers and isolate AUTH_REQUIRED/failures per source
+    cmds:
+      - uv run python -m src.infrastructure.finance_sync_cli run {{.CLI_ARGS}}
+
   finance:ingest:
     desc: Archive one official export and update its source coverage state
     cmds:
