@@ -42,15 +42,15 @@ class CommandDriver(AcquisitionDriver):
             timeout=self.config.timeout_seconds,
             shell=False,
         )
-        if completed.returncode != 0 and not completed.stdout.strip():
-            return DriverResult(
-                status="FAILED",
-                error_code=f"DRIVER_EXIT_{completed.returncode}",
-            )
 
         try:
             payload = json.loads(completed.stdout)
         except json.JSONDecodeError:
+            if completed.returncode != 0:
+                return DriverResult(
+                    status="FAILED",
+                    error_code=f"DRIVER_EXIT_{completed.returncode}",
+                )
             return DriverResult(status="FAILED", error_code="INVALID_DRIVER_JSON")
 
         status = str(payload.get("status", "FAILED"))
@@ -59,6 +59,13 @@ class CommandDriver(AcquisitionDriver):
                 status="AUTH_REQUIRED",
                 error_code=str(payload.get("error_code") or "AUTH_REQUIRED"),
             )
+
+        if completed.returncode != 0:
+            return DriverResult(
+                status="FAILED",
+                error_code=f"DRIVER_EXIT_{completed.returncode}",
+            )
+
         if status != "SUCCESS":
             return DriverResult(
                 status="FAILED",
