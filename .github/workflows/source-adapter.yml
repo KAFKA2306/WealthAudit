@@ -6,6 +6,7 @@ on:
     paths:
       - "src/use_cases/source_adapter.py"
       - "src/use_cases/finance_acquisition.py"
+      - "src/use_cases/finance_runner.py"
       - "src/infrastructure/finance_sync_cli.py"
       - "src/interface_adapters/official_apis.py"
       - "src/interface_adapters/source_registry.py"
@@ -20,6 +21,7 @@ on:
     paths:
       - "src/use_cases/source_adapter.py"
       - "src/use_cases/finance_acquisition.py"
+      - "src/use_cases/finance_runner.py"
       - "src/infrastructure/finance_sync_cli.py"
       - "src/interface_adapters/official_apis.py"
       - "src/interface_adapters/source_registry.py"
@@ -49,6 +51,7 @@ jobs:
           python -m py_compile
           src/use_cases/source_adapter.py
           src/use_cases/finance_acquisition.py
+          src/use_cases/finance_runner.py
           src/infrastructure/finance_sync_cli.py
           src/interface_adapters/official_apis.py
           src/interface_adapters/source_registry.py
