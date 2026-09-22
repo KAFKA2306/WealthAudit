@@ -5,9 +5,23 @@ on:
     branches: [main]
     paths:
       - "src/use_cases/source_adapter.py"
+      - "src/use_cases/finance_acquisition.py"
+      - "src/use_cases/finance_runner.py"
+      - "src/infrastructure/finance_sync_cli.py"
+      - "src/interface_adapters/command_driver.py"
+      - "src/interface_adapters/zaim_api.py"
       - "src/interface_adapters/official_apis.py"
       - "src/interface_adapters/source_registry.py"
+      - "config/finance_sources.json"
+      - "config/driver_commands.example.json"
+      - "scripts/provider_drivers/zaim_export.py"
+      - "scripts/install_finance_scheduler.ps1"
+      - "scripts/uninstall_finance_scheduler.ps1"
       - "tests/test_source_adapter.py"
+      - "tests/test_finance_acquisition.py"
+      - "tests/test_command_driver.py"
+      - "tests/test_zaim_api.py"
+      - "tests/test_zaim_export_driver.py"
       - "tests/test_official_apis.py"
       - "docs/source-adapters.md"
       - ".github/workflows/source-adapter.yml"
@@ -15,9 +29,19 @@ on:
   pull_request:
     paths:
       - "src/use_cases/source_adapter.py"
+      - "src/use_cases/finance_acquisition.py"
+      - "src/use_cases/finance_runner.py"
+      - "src/infrastructure/finance_sync_cli.py"
+      - "src/interface_adapters/command_driver.py"
       - "src/interface_adapters/official_apis.py"
       - "src/interface_adapters/source_registry.py"
+      - "config/finance_sources.json"
+      - "config/driver_commands.example.json"
+      - "scripts/install_finance_scheduler.ps1"
+      - "scripts/uninstall_finance_scheduler.ps1"
       - "tests/test_source_adapter.py"
+      - "tests/test_finance_acquisition.py"
+      - "tests/test_command_driver.py"
       - "tests/test_official_apis.py"
       - "docs/source-adapters.md"
       - ".github/workflows/source-adapter.yml"
@@ -36,22 +60,35 @@ jobs:
           python-version: "3.12"
       - name: Install adapter, MCP and test dependencies without rewriting the lockfile
         run: python -m pip install -e '.[dev,mcp]'
-      - name: Compile adapter
+      - name: Compile adapter and acquisition control plane
         run: >-
           python -m py_compile
           src/use_cases/source_adapter.py
+          src/use_cases/finance_acquisition.py
+          src/use_cases/finance_runner.py
+          src/infrastructure/finance_sync_cli.py
+          src/interface_adapters/command_driver.py
+          src/interface_adapters/zaim_api.py
           src/interface_adapters/official_apis.py
           src/interface_adapters/source_registry.py
           tests/test_source_adapter.py
+          tests/test_finance_acquisition.py
+          tests/test_command_driver.py
+          tests/test_zaim_api.py
+          tests/test_zaim_export_driver.py
           tests/test_official_apis.py
-      - name: Adapter tests
-        run: pytest -q tests/test_source_adapter.py tests/test_official_apis.py
+      - name: Adapter and acquisition tests
+        run: pytest -q tests/test_source_adapter.py tests/test_finance_acquisition.py tests/test_command_driver.py tests/test_zaim_api.py tests/test_zaim_export_driver.py tests/test_official_apis.py
+      - name: Finance acquisition plan smoke test
+        run: python -m src.infrastructure.finance_sync_cli plan >/tmp/finance-plan.json
+      - name: Finance unattended run smoke test
+        run: python -m src.infrastructure.finance_sync_cli --data-root /tmp/wealthaudit-finance run >/tmp/finance-run.json
       - name: Full regression suite
         run: pytest -q
       - name: Reject tracked raw or secret-like runtime artifacts
         run: |
-          if git ls-files | grep -E '(^data/|(^|/)(cookies?|tokens?|raw|staging)(/|$)|\.html\.dump$)' ; then
-            echo "Tracked runtime/raw artifact detected" >&2
+          if git ls-files | grep -E '(^data/|(^|/)(cookies?|tokens?|raw|staging|\.auth)(/|$)|storage-state.*\.json$|\.har$|\.html\.dump$)' ; then
+            echo "Tracked runtime/raw/auth artifact detected" >&2
             exit 1
           fi
       - name: Cleanup generated caches

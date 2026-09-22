@@ -72,6 +72,13 @@ backup/
 *conflicted copy*
 *Conflicted copy*
 
+# Browser / authentication runtime state
+.auth/
+playwright/.auth/
+storage-state*.json
+*.har
+trace.zip
+
 # 個人の金融サービス構成。公開側は *.example.csv のみ追跡する。
 /master/accounts.csv
 /master/payment_methods.csv

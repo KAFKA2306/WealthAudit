@@ -1,0 +1,16 @@
+{
+  "schema_version": "wealthaudit.driver-commands.v1",
+  "drivers": [
+    {
+      "source_id": "zaim",
+      "argv": [
+        "uv",
+        "run",
+        "python",
+        "scripts/provider_drivers/zaim_export.py"
+      ],
+      "timeout_seconds": 600,
+      "working_directory": null
+    }
+  ]
+}
