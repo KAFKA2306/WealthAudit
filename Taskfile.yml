@@ -61,17 +61,17 @@ tasks:
   finance:plan:
     desc: Show retention-aware acquisition actions for every configured finance source
     cmds:
-      - uv run python -m src.infrastructure.finance_sync_cli {{.CLI_ARGS}} plan
+      - uv run python -m src.infrastructure.finance_sync_cli plan {{.CLI_ARGS}}
 
   finance:ingest:
     desc: Archive one official export and update its source coverage state
     cmds:
-      - uv run python -m src.infrastructure.finance_sync_cli {{.CLI_ARGS}} ingest
+      - uv run python -m src.infrastructure.finance_sync_cli ingest {{.CLI_ARGS}}
 
   finance:auth-required:
     desc: Mark one provider AUTH_REQUIRED without stopping other providers
     cmds:
-      - uv run python -m src.infrastructure.finance_sync_cli {{.CLI_ARGS}} auth-required
+      - uv run python -m src.infrastructure.finance_sync_cli auth-required {{.CLI_ARGS}}
 
   audit:recalculate:
     desc: Recalculate all outputs and export before/after numeric differences
