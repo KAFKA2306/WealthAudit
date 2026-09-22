@@ -8,7 +8,7 @@ import tempfile
 from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 VALID_STATUSES = {
     "OK",
@@ -181,6 +181,16 @@ def _safe_segment(value: str) -> str:
     return normalized[:120]
 
 
+def _safe_filename(value: str) -> str:
+    original = Path(value).name
+    path = Path(original)
+    stem = re.sub(r"[^A-Za-z0-9._-]+", "_", path.stem).strip("._")
+    if not stem:
+        stem = "artifact"
+    suffix = re.sub(r"[^A-Za-z0-9.]+", "", "".join(path.suffixes))
+    return f"{stem[:96]}{suffix[:24]}"
+
+
 def archive_raw_artifact(
     *,
     root: Path,
@@ -196,7 +206,7 @@ def archive_raw_artifact(
     digest = hashlib.sha256(raw).hexdigest()
     source = _safe_segment(source_id)
     account = _safe_segment(account_alias)
-    filename = _safe_segment(Path(original_filename).name)
+    filename = _safe_filename(original_filename)
     day = acquired.date().isoformat()
     relative = Path("raw") / source / account / day / f"{digest[:16]}_{filename}"
     target = root / relative
@@ -264,6 +274,26 @@ def mark_auth_required(
     )
 
 
+def mark_failed(
+    state: SourceState,
+    *,
+    attempted_at: str | None = None,
+    error_code: str = "ACQUISITION_FAILED",
+) -> SourceState:
+    return SourceState(
+        source_id=state.source_id,
+        status="FAILED",
+        last_attempt_at=attempted_at or datetime.now(timezone.utc).isoformat(),
+        last_success_at=state.last_success_at,
+        covered_from=state.covered_from,
+        covered_to=state.covered_to,
+        record_count=state.record_count,
+        raw_file_count=state.raw_file_count,
+        last_raw_sha256=state.last_raw_sha256,
+        error_code=error_code,
+    )
+
+
 def mark_success(
     state: SourceState,
     artifact: ArchivedArtifact,
@@ -290,15 +320,26 @@ def coverage_rows(
     state_dir: Path,
     now: datetime | None = None,
 ) -> list[dict[str, Any]]:
+    current = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
     rows: list[dict[str, Any]] = []
     for policy in policies:
         state = load_source_state(state_dir / f"{policy.source_id}.json", policy.source_id)
-        decision = acquisition_decision(policy, state, now=now)
+        decision = acquisition_decision(policy, state, now=current)
+        stale_days = None
+        if state.last_success_at:
+            stale_days = max(0, (current - _parse_timestamp(state.last_success_at)).days)
+        coverage_status = {
+            "NOOP": "OK",
+            "ACQUIRE": "DUE",
+            "WAIT_FOR_AUTH": "AUTH_REQUIRED",
+            "REVIEW_REQUIRED": "REVIEW_REQUIRED",
+        }[decision.action]
         rows.append(
             {
                 "source_id": policy.source_id,
                 "priority": policy.priority,
                 "status": state.status,
+                "coverage_status": coverage_status,
                 "action": decision.action,
                 "reason": decision.reason,
                 "last_success_at": state.last_success_at,
@@ -306,6 +347,7 @@ def coverage_rows(
                 "covered_to": state.covered_to,
                 "record_count": state.record_count,
                 "raw_file_count": state.raw_file_count,
+                "stale_days": stale_days,
                 "next_due_at": decision.next_due_at,
             }
         )
