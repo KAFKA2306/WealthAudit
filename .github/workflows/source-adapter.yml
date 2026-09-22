@@ -59,7 +59,7 @@ jobs:
           tests/test_finance_acquisition.py
           tests/test_official_apis.py
       - name: Adapter and acquisition tests
-        run: pytest -q tests/test_source_adapter.py tests/test_finance_acquisition.py tests/test_official_apis.py
+        run: pytest -q tests/test_source_adapter.py tests/test_finance_acquisition.py tests/test_command_driver.py tests/test_official_apis.py
       - name: Finance acquisition plan smoke test
         run: python -m src.infrastructure.finance_sync_cli plan >/tmp/finance-plan.json
       - name: Full regression suite
