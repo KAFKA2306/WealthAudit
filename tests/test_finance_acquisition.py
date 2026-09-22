@@ -15,6 +15,7 @@ from src.use_cases.finance_acquisition import (
     mark_success,
     save_source_state,
 )
+from src.use_cases.finance_runner import DriverResult, run_acquisition_cycle
 
 
 def _policy(**overrides):
@@ -108,6 +109,24 @@ def test_raw_archive_is_content_addressed_and_idempotent(tmp_path: Path):
     assert (tmp_path / first.path).exists()
 
 
+def test_japanese_export_filename_is_safely_archived(tmp_path: Path):
+    artifact = archive_raw_artifact(
+        root=tmp_path,
+        source_id="card",
+        account_alias="primary",
+        raw=b"header\nvalue\n",
+        original_filename="利用明細.csv",
+        acquired_at="2026-09-22T00:00:00+00:00",
+    )
+    assert artifact.path.endswith("_artifact.csv")
+    manifest = json.loads(
+        (tmp_path / "state" / "artifacts" / f"{artifact.raw_sha256}.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert manifest["original_filename"] == "利用明細.csv"
+
+
 def test_success_state_counts_only_new_raw_files(tmp_path: Path):
     state = SourceState(source_id="card")
     artifact = archive_raw_artifact(
@@ -142,6 +161,67 @@ def test_state_round_trip(tmp_path: Path):
     )
     save_source_state(path, state)
     assert load_source_state(path, "card") == state
+
+
+class _AuthDriver:
+    def acquire(self, policy: SourcePolicy) -> DriverResult:
+        del policy
+        return DriverResult(status="AUTH_REQUIRED", error_code="MFA_REQUIRED")
+
+
+class _SuccessDriver:
+    def acquire(self, policy: SourcePolicy) -> DriverResult:
+        return DriverResult(
+            status="SUCCESS",
+            raw=f"source={policy.source_id}".encode(),
+            original_filename="明細.csv",
+            covered_from="2026-09-01",
+            covered_to="2026-09-22",
+            record_count=2,
+        )
+
+
+class _FailingDriver:
+    def acquire(self, policy: SourcePolicy) -> DriverResult:
+        del policy
+        raise RuntimeError("provider changed")
+
+
+def test_runner_continues_after_auth_required(tmp_path: Path):
+    policies = (
+        _policy(source_id="needs_auth"),
+        _policy(source_id="continues"),
+    )
+    outcomes = run_acquisition_cycle(
+        policies,
+        drivers={"needs_auth": _AuthDriver(), "continues": _SuccessDriver()},
+        data_root=tmp_path,
+        now=datetime(2026, 9, 22, tzinfo=timezone.utc),
+    )
+    assert [item["result"] for item in outcomes] == ["AUTH_REQUIRED", "SUCCESS"]
+    assert load_source_state(
+        tmp_path / "state" / "sources" / "needs_auth.json", "needs_auth"
+    ).status == "AUTH_REQUIRED"
+    assert load_source_state(
+        tmp_path / "state" / "sources" / "continues.json", "continues"
+    ).status == "OK"
+
+
+def test_runner_continues_after_provider_failure(tmp_path: Path):
+    policies = (
+        _policy(source_id="broken"),
+        _policy(source_id="healthy"),
+    )
+    outcomes = run_acquisition_cycle(
+        policies,
+        drivers={"broken": _FailingDriver(), "healthy": _SuccessDriver()},
+        data_root=tmp_path,
+        now=datetime(2026, 9, 22, tzinfo=timezone.utc),
+    )
+    assert [item["result"] for item in outcomes] == ["FAILED", "SUCCESS"]
+    assert load_source_state(
+        tmp_path / "state" / "sources" / "broken.json", "broken"
+    ).status == "FAILED"
 
 
 def test_repository_registry_is_machine_readable():
