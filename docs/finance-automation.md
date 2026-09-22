@@ -187,3 +187,28 @@ scheduled human work = 0
 9. long-history banks / securities
 
 browser automationの目的はHTMLを正本化することではありません。公式サイト上の公式CSV/PDF export操作を自動化し、取得した公式artifactを正本のRaw Archiveへ渡すことです。
+
+
+## Implemented provider driver: Zaim secondary probe
+
+`scripts/provider_drivers/zaim_export.py` is the first concrete unattended provider driver.
+
+Required local environment variables:
+
+```text
+ZAIM_CONSUMER_KEY
+ZAIM_CONSUMER_SECRET
+ZAIM_ACCESS_TOKEN
+ZAIM_ACCESS_TOKEN_SECRET
+```
+
+Optional bounded query:
+
+```text
+ZAIM_START_DATE=YYYY-MM-DD
+ZAIM_END_DATE=YYYY-MM-DD
+```
+
+It fetches `/v2/home/money` page-by-page, preserves the exact JSON responses in a ZIP under `data/incoming/zaim/`, records a manifest with SHA-256 per page, and hands that official/API artifact to the normal Raw Archive boundary.
+
+This source remains `secondary_only=true`. WealthAudit does not assume that every bank/card item visible in the Zaim UI is exposed by the API. Completeness must be measured against primary official exports before any Zaim record is treated as coverage evidence.
