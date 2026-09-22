@@ -13,6 +13,11 @@ REQUIRED_OPERATIONAL_PATTERNS = {
     "*.tmp",
     "*conflicted copy*",
     "*Conflicted copy*",
+    ".auth/",
+    "playwright/.auth/",
+    "storage-state*.json",
+    "*.har",
+    "trace.zip",
     "/master/accounts.csv",
     "/master/payment_methods.csv",
 }
