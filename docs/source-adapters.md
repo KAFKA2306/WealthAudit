@@ -3,10 +3,24 @@
 WealthAudit の取得境界は次に固定します。
 
 ```text
-authenticate -> fetch raw -> parse -> normalize -> validate -> handoff
+auth result -> fetch raw -> parse -> normalize -> validate -> handoff
 ```
 
 provider 固有の認証・field mapping・pagination は adapter / API client に閉じ込め、BS/PL/CF・FI・forecast の計算は既存 domain / use-case 層だけで行います。
+
+## Authentication result boundary
+
+`SourceAdapter.authenticate()` は必ず `AuthResult` を返します。状態は `success | cancel | timeout | failure | unavailable` の5種類です。`success` だけが一時的な auth context を持てます。その他の状態は context を持てず、`SourceAdapter.run()` は fetch を開始する前に fail closed します。
+
+この境界は Android / OS / browser / third-party provider から返る認証結果を受けるための repository-owned contract です。password、OTP、passkey秘密鍵を保存・模倣しません。実端末で本人承認が成功することは repository completion の条件ではありません。
+
+## Source metadata / provenance
+
+各 adapter は `SourceContract` を宣言し、少なくとも `source_id`、`acquisition_method`、`auth_mode`、`supported_period`、一次情報を示す `provenance` を固定します。成功した取得だけが `SourceProvenance` を生成し、`fetched_at`、取得できる場合の `source_published_at`、正規化後の `record_count`、parse 後の `raw_record_count`、table 別 `table_record_counts`、raw response の `content_hash`、`status=success` を保存します。
+
+fixture / controlled integration の検証だけでは `runtime_verification=UNVERIFIED` のままです。実 provider の runtime evidence を観測していない状態を `VERIFIED` に昇格しません。
+
+取消・期限切れ・失敗・利用不能では成功 provenance を生成しません。未取得を0件や正常終了へ変換しません。月次 close が失敗した場合も、直前に確定済みの provenance を更新しません。
 
 ## Canonical handoff
 
@@ -17,7 +31,7 @@ provider 固有の認証・field mapping・pagination は adapter / API client �
 - `assets`
 - `market`
 
-共有 validator は unknown table、必須列欠損、対象月不一致、重複 identity、未知 account / payment method を fail-close します。失敗した取得は成功した `AdapterResult` を生成せず、確定済み月を更新しません。
+共有 validator は unknown table、必須列欠損、対象月不一致、重複 identity、未知 account / payment method を fail-close します。`src/infrastructure/source_adapter_monthly.py` は validated tables を既存 `MonthlyCloseWorkflow` へ渡し、calculate -> audit -> close が成功した後だけ provenance を確定します。同一 canonical input の再投入は既存 monthly-close fingerprint により再計算されません。
 
 ## Implemented official API clients
 
