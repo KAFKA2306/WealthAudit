@@ -1,0 +1,126 @@
+{
+  "schema_version": "wealthaudit.finance-sources.v1",
+  "sources": [
+    {
+      "source_id": "mobile_suica",
+      "priority": "P0",
+      "acquisition_method": "device_history",
+      "cadence_days": 7,
+      "retention_days": 182,
+      "safety_margin_days": 28,
+      "official_reference": "https://www.jreast.co.jp/mobilesuica/use/sf/chk_account.html",
+      "max_records": 100,
+      "secondary_only": false
+    },
+    {
+      "source_id": "jonan_shinkin",
+      "priority": "P0",
+      "acquisition_method": "official_csv",
+      "cadence_days": 21,
+      "retention_days": 60,
+      "safety_margin_days": 14,
+      "official_reference": "https://www.jsbank.co.jp/netbank/guide.html",
+      "max_records": 100,
+      "secondary_only": false
+    },
+    {
+      "source_id": "rakuten_cash",
+      "priority": "P0",
+      "acquisition_method": "app_or_web_history",
+      "cadence_days": 30,
+      "retention_days": 365,
+      "safety_margin_days": 60,
+      "official_reference": "https://point.rakuten.co.jp/guidance/historycheck/",
+      "max_records": null,
+      "secondary_only": false
+    },
+    {
+      "source_id": "rakuten_card",
+      "priority": "P0",
+      "acquisition_method": "official_csv",
+      "cadence_days": 30,
+      "retention_days": 450,
+      "safety_margin_days": 90,
+      "official_reference": "https://www.rakuten-card.co.jp/service/bill/",
+      "max_records": null,
+      "secondary_only": false
+    },
+    {
+      "source_id": "vpass",
+      "priority": "P0",
+      "acquisition_method": "official_csv",
+      "cadence_days": 30,
+      "retention_days": 450,
+      "safety_margin_days": 90,
+      "official_reference": "https://www.smbc-card.com/mem/oshiharai/meisai_about.jsp",
+      "max_records": null,
+      "secondary_only": false
+    },
+    {
+      "source_id": "mercard",
+      "priority": "P0",
+      "acquisition_method": "app_history",
+      "cadence_days": 30,
+      "retention_days": null,
+      "safety_margin_days": 0,
+      "official_reference": "https://help.jp.mercari.com/guide/articles/2037/",
+      "max_records": null,
+      "secondary_only": false
+    },
+    {
+      "source_id": "paypay",
+      "priority": "P1",
+      "acquisition_method": "official_app_csv",
+      "cadence_days": 30,
+      "retention_days": 730,
+      "safety_margin_days": 120,
+      "official_reference": "https://paypay.ne.jp/help/c0447/",
+      "max_records": null,
+      "secondary_only": false
+    },
+    {
+      "source_id": "rakuten_bank",
+      "priority": "P2",
+      "acquisition_method": "official_csv",
+      "cadence_days": 90,
+      "retention_days": null,
+      "safety_margin_days": 0,
+      "official_reference": "https://www.rakuten-bank.co.jp/guide/login/screen.html",
+      "max_records": null,
+      "secondary_only": false
+    },
+    {
+      "source_id": "sony_bank",
+      "priority": "P2",
+      "acquisition_method": "official_csv",
+      "cadence_days": 90,
+      "retention_days": null,
+      "safety_margin_days": 0,
+      "official_reference": "https://sonybank.jp/products/yen/",
+      "max_records": null,
+      "secondary_only": false
+    },
+    {
+      "source_id": "epos_card",
+      "priority": "P2",
+      "acquisition_method": "official_csv",
+      "cadence_days": 90,
+      "retention_days": null,
+      "safety_margin_days": 0,
+      "official_reference": "https://faq.eposcard.co.jp/faq/show/90",
+      "max_records": null,
+      "secondary_only": false
+    },
+    {
+      "source_id": "zaim",
+      "priority": "P1",
+      "acquisition_method": "secondary_api",
+      "cadence_days": 7,
+      "retention_days": null,
+      "safety_margin_days": 0,
+      "official_reference": "https://dev.zaim.net/",
+      "max_records": null,
+      "secondary_only": true
+    }
+  ]
+}
